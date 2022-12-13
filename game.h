@@ -6,6 +6,7 @@
 #include <fcntl.h>  
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <time.h>
 
 #define WINDOW_SIZE 20
 #define SOCKET_NAME "/tmp/sock_game"
@@ -19,11 +20,15 @@ typedef struct player_info_t
     int ch;
     int pos_x, pos_y;
     int HP;
+
+    struct sockaddr_un client_addr;
+    socklen_t client_addr_size;
 } player_info_t;
 
 typedef struct message_t
 {   
     msg_type_t msg_type; 
     player_info_t player;
+    WINDOW game_state;
     direction_t direction;
 } message_t;
