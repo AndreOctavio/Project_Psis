@@ -3,7 +3,7 @@
 void initialization (struct sockaddr_un client_addr [10], player_info_t players [10]) {
 
     for (int i = 0; i < 10; i++) {
-        client_addr [i] = -1; //se não funcionar usar NULL
+        //client_addr [i] = NULL; //se não funcionar usar NULL
         players [i].ch = -1;
     }
 }
@@ -89,24 +89,26 @@ int main()
     clock_t time_init;
     double time_passed;
 
+    struct sockaddr_un tmp;
+
     while (1)
     {
         //Receive message from the clients
-        n_bytes = recvfrom(sock_fd, &msg, sizeof(message_t), 0, (struct sockaddr *)&client_addr, &client_addr_size);
+        n_bytes = recvfrom(sock_fd, &msg, sizeof(message_t), 0, (struct sockaddr *)&tmp, &client_addr_size);
         
-        if (current_players != 0) {
-            time_passed = (double)(clock() - time_init) / CLOCKS_PER_SEC;
-            if (time_passed > 5.0) {
-                prizes_to_spawn = time_passed/5.0;
+        // if (current_players != 0) {
+        //     time_passed = (double)(clock() - time_init) / CLOCKS_PER_SEC;
+        //     if (time_passed > 5.0) {
+        //         prizes_to_spawn = time_passed/5.0;
 
-                for (int n; n < prizes_to_spawn; n++) {
-                    if ()
-                    prize_spawn();
-                }
+        //         // for (int n; n < prizes_to_spawn; n++) {
+        //         //     if ()
+        //         //     prize_spawn();
+        //         // }
 
-                time_init = clock();
-            }
-        }
+        //         time_init = clock();
+        //     }
+        // }
 
         //Check if received correct structure
         if (n_bytes!= sizeof(message_t)){
@@ -123,8 +125,10 @@ int main()
             }
 
             while (!clear) {
-                pos_x = rand() % 21;
-                pos_y = rand() % 21;
+                // pos_x = rand() % 21;
+                // pos_y = rand() % 21;
+                pos_x = 10;
+                pos_y = 10;
                 
                 clear = 1;
 
@@ -143,13 +147,13 @@ int main()
             //Keep the new players information
             for (i = 0; i < 10; i++) {
                 if (player_data [i].ch == -1) {
-                    player_data[i].ch = msg.player.ch;
+                    player_data[i].ch = msg.player[msg.player_num].ch;
 
                     player_data[i].pos_x = pos_x;
                     player_data[i].pos_y = pos_y;
-                    player_data[i].HP = 10;
+                    player_data[i].hp = 10;
 
-                    client_addr [i] = client_addr;
+                    client_addr [i] = tmp;
                 }
             }
 
@@ -159,18 +163,21 @@ int main()
             wrefresh(my_win);	
 
             msg.msg_type = ball_information;
-            msg.player = player_data;
             msg.player_num = i;
+
+            for (i = 0; i < 10; i++) {
+                msg.player [i] = player_data[i];
+            }
             
             //Ball_information message
-            sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr, client_addr_size);
+            sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &tmp, client_addr_size);
 
         } else if (current_players == 10){ //Already 10 players in the game
 
             msg.msg_type = lobby_full;
 
             //Lobby_full message
-            sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr, client_addr_size);
+            sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &tmp, client_addr_size);
             continue;
 
         }
@@ -205,16 +212,16 @@ int main()
                 for(int j = 0 ; j < 10; j++){
                     if((player_data [j].ch != -1) && (j != i)) {
                         if (player_data[j].pos_x == pos_x && player_data[j].pos_y == pos_y){ //Player hits another player
-                            if (player_data [i].HP <= 9) { //If the player has less(or equal to) than 9 lives increment HP
-                                player_data [i].HP++;
+                            if (player_data [i].hp <= 9) { //If the player has less(or equal to) than 9 lives increment HP
+                                player_data [i].hp++;
                             }
 
-                            player_data [j].HP--; //Decrease HP of the player that was hit
+                            player_data [j].hp--; //Decrease HP of the player that was hit
 
-                            if (player_data [j].HP == 0) { //If the player that was hit has 0 lives than its GAME OVER
+                            if (player_data [j].hp == 0) { //If the player that was hit has 0 lives than its GAME OVER
                                 //Health_0 message;
                                 msg.msg_type = health_0;
-                                sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &player_data [j].client_addr, player_data [j].client_addr_size);
+                                sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
                                 player_data [j].ch = -1;
                             }
                         }
@@ -230,8 +237,12 @@ int main()
 
                 //Field_status message
                 msg.msg_type = field_status;
-                msg.player = player_data;
-                sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr, client_addr_size);
+
+                for (i = 0; i < 10; i++) {
+                    msg.player [i] = player_data[i];
+                } 
+
+                sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[msg.player_num], client_addr_size);
                 
                 found = 0;
             }

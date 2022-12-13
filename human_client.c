@@ -147,9 +147,9 @@ int main(){
             }
 
             if(msg.msg_type == field_status){
-                wclear();
+                wclear(my_win);
                 box(my_win, 0 , 0);
-                for(int i; i < 10, i++){
+                for(int i; i < 10; i++){
                     if(i != -1){
                         /* Draw all the players */
                         draw_player(my_win, &player, 1);
