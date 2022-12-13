@@ -1,3 +1,12 @@
+#include <stdlib.h>
+#include <ncurses.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>  
+#include <sys/socket.h>
+#include <sys/un.h>
+
 #define WINDOW_SIZE 20
 #define SOCKET_NAME "/tmp/sock_game"
 
@@ -12,9 +21,10 @@ typedef struct player_info_t
     int HP;
 } player_info_t;
 
-typedef struct remote_player_t
+/* Message Structure */
+typedef struct message_t
 {   
     msg_type_t msg_type; 
     char ch; 
     direction_t direction;
-} remote_player_t;
+} message_t;

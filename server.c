@@ -1,12 +1,4 @@
-#include <stdlib.h>
-#include <ncurses.h>
-#include "remote-char.h"
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>  
-#include <sys/socket.h>
-#include <sys/un.h>
+#include "game.h"
 
 int main()
 {	
@@ -55,15 +47,15 @@ int main()
     struct sockaddr_un client_addr;
     socklen_t client_addr_size = sizeof(struct sockaddr_un);
 
-    remote_player_t msg;
+    message_t msg;
 
     while (1)
     {
         //Receive message from the clients
-        n_bytes = recvfrom(sock_fd, &msg, sizeof(remote_player_t), 0, (const struct sockaddr *)&client_addr, &client_addr_size);
+        n_bytes = recvfrom(sock_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *)&client_addr, &client_addr_size);
         
         //Check if received correct structure
-        if (n_bytes!= sizeof(remote_player_t)){
+        if (n_bytes!= sizeof(message_t)){
             continue;
         }
         
