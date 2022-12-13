@@ -26,13 +26,7 @@ typedef struct player_info_t
 typedef struct message_t
 {   
     msg_type_t msg_type; 
-    player_info_t player;
+    player_info_t player[10];
+    int player_num;
     direction_t direction;
 } message_t;
-
-typedef struct field_status_t
-{   
-    msg_type_t msg_type;
-    player_info_t player[10];
-
-} field_status_t;

@@ -4,6 +4,20 @@ WINDOW * message_win;
 WINDOW * my_win;
 
 
+void draw_player(WINDOW *win, player_info_t * player, int delete){
+    int ch;
+    if(delete){
+        ch = player->ch;
+    }else{
+        ch = ' ';
+    }
+    int p_x = player->pos_x;
+    int p_y = player->pos_y;
+    wmove(win, p_y, p_x);
+    waddch(win,ch);
+    wrefresh(win);
+}
+
 
 int main(){
 
@@ -19,10 +33,10 @@ int main(){
     /* Setup message */
     message_t msg;
     msg.msg_type = 0;
-    msg.player = player;
+    msg.player[0] = player;
+    msg.player_num = 0;
 
     int socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
-
     if (socket_fd == -1){
         perror("socket: ");
         exit(-1);
@@ -31,9 +45,11 @@ int main(){
     /* Create client socket */
     struct sockaddr_un local_client_addr;
     local_client_addr.sun_family = AF_UNIX;
+    
     sprintf(local_client_addr.sun_path, "%s_%d", SOCKET_NAME, getpid());
 
 	unlink(local_client_addr.sun_path);
+
 	int err = bind(socket_fd, (struct sockaddr *) &local_client_addr, sizeof(local_client_addr));
 	if(err == -1) {
 		perror("bind");
@@ -44,22 +60,15 @@ int main(){
 
     /* Server infos */
 	struct sockaddr_un server_addr;
-    printf("Server infos set\n");
 	server_addr.sun_family = AF_UNIX;
-    printf("Server infos set\n");
 	strcpy(server_addr.sun_path, SOCKET_NAME);
-
-    printf("Server infos set\n");
 
     /* Send connect message to server */
     int n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
-
     if (n_bytes!= sizeof(message_t)){
         perror("write");
         exit(-1);
     }
-
-    printf("Sent message to server %c\n", msg.player.ch);
 
     /* Receive Ball_information message from server */
 
@@ -70,12 +79,13 @@ int main(){
         exit(-1);
     }
 
-    printf("Received message from server %c\n", msg.player.ch);
+    printf("Received message from server %c\n", msg.player[msg.player_num].ch);
     scanf("%c", &character);
 
     /* Set player's position */
-    player.pos_x = msg.player.pos_x;
-    player.pos_y = msg.player.pos_y;
+
+    player.pos_x = msg.player[msg.player_num].pos_x;
+    player.pos_y = msg.player[msg.player_num].pos_y;
 
     /* ncurses initialization */
     initscr();
@@ -90,58 +100,49 @@ int main(){
 	wrefresh(my_win);
     keypad(my_win, true);
 
-    /* Creates a window and draws a border */
-    if(sizeof(my_win) == sizeof(&(msg.game_state))){
-        my_win = &msg.game_state;
-        wrefresh(my_win);
-    } else {
-        printf("Error: my_win and msg.game_state are not the same size");
-    }
 
-    /* creates a window and draws a border */
-    // message_win = &msg.message_win;
-	// wrefresh(message_win);
-    int key = wgetch(my_win);
 
-    // /* Playing loop */
-    // int key = -1;
-    // while(key != 27 && key!= 'q'){
-    //     key = wgetch(my_win);
+    /* Playing loop */
+    int key = -1;
+    while(key != 27 && key!= 'q'){
+        key = wgetch(my_win);
 
-    //     msg.msg_type = ball_movement;
+        msg.msg_type = ball_movement;
 
-    //     if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN){
-    //         msg.player = player;
-    //         msg.direction = key;
+        if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN){
+            msg.player[msg.player_num] = player;
+            msg.direction = key;
 
-    //         /* Send message to server */
-    //         n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
+            /* Send message to server */
+            n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
 
-    //         if (n_bytes!= sizeof(message_t)){
-    //             perror("write");
-    //             exit(-1);
-    //         }
+            if (n_bytes!= sizeof(message_t)){
+                perror("write");
+                exit(-1);
+            }
 
-    //         /* Receive message from server */
-    //         n_bytes = recv(socket_fd, &msg, sizeof(message_t), 0);
+            /* Receive message from server */
+            n_bytes = recv(socket_fd, &msg, sizeof(message_t), 0);
 
-    //         if (n_bytes!= sizeof(message_t)){
-    //             perror("read");
-    //             exit(-1);
-    //         }
+            if (n_bytes!= sizeof(message_t)){
+                perror("read");
+                exit(-1);
+            }
+
+            if(msg.msg_type == field_status){
+
+            }
             
-    //         my_win = &msg.game_state;
-    //         wrefresh(my_win);
+            /* Draw player */
+            draw_player(my_win, &player, 1);
 
-    //         message_win = &msg.message_win;
+            mvwprintw(message_win, 1,1,"%c key pressed", key);
+            wrefresh(message_win);	
 
-    //         mvwprintw(message_win, 1,1,"%c key pressed", key);
-    //         wrefresh(message_win);	
-
-    //     }
+        }
 
 
-    // }
+    }
 
 
     close(socket_fd);
