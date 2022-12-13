@@ -19,7 +19,7 @@ typedef struct player_info_t
 {   
     char ch;
     int pos_x, pos_y;
-    int HP;
+    int hp;
 
 } player_info_t;
 

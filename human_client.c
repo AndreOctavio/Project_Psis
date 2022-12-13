@@ -5,16 +5,19 @@ WINDOW * my_win;
 
 
 void draw_player(WINDOW *win, player_info_t * player, int delete){
+
+    int p_x = player->pos_x;
+    int p_y = player->pos_y;
     int ch;
+
     if(delete){
         ch = player->ch;
     }else{
         ch = ' ';
     }
-    int p_x = player->pos_x;
-    int p_y = player->pos_y;
+
     wmove(win, p_y, p_x);
-    waddch(win,ch);
+    waddch(win, ch);
     wrefresh(win);
 }
 
@@ -30,22 +33,23 @@ int main(){
     player_info_t player;
     player.ch = character;
 
+
     /* Setup message */
     message_t msg;
     msg.msg_type = 0;
     msg.player[0] = player;
     msg.player_num = 0;
 
+
+    /* Create client socket */
+    struct sockaddr_un local_client_addr;
+    local_client_addr.sun_family = AF_UNIX;
     int socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (socket_fd == -1){
         perror("socket: ");
         exit(-1);
     }
 
-    /* Create client socket */
-    struct sockaddr_un local_client_addr;
-    local_client_addr.sun_family = AF_UNIX;
-    
     sprintf(local_client_addr.sun_path, "%s_%d", SOCKET_NAME, getpid());
 
 	unlink(local_client_addr.sun_path);
@@ -63,6 +67,8 @@ int main(){
 	server_addr.sun_family = AF_UNIX;
 	strcpy(server_addr.sun_path, SOCKET_NAME);
 
+
+
     /* Send connect message to server */
     int n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
     if (n_bytes!= sizeof(message_t)){
@@ -71,21 +77,20 @@ int main(){
     }
 
     /* Receive Ball_information message from server */
-
     n_bytes = recvfrom(socket_fd, &msg, sizeof(message_t), 0, NULL, NULL);
-
     if (n_bytes!= sizeof(message_t)){
         perror("read");
         exit(-1);
     }
 
-    printf("Received message from server %c\n", msg.player[msg.player_num].ch);
-    scanf("%c", &character);
+    printf("Received message from server %c\n", msg.player[msg.player_num].ch); // DEBUG ---------------
+    scanf("%c", &character); // DEBUG ---------------
 
     /* Set player's position */
-
     player.pos_x = msg.player[msg.player_num].pos_x;
     player.pos_y = msg.player[msg.player_num].pos_y;
+
+
 
     /* ncurses initialization */
     initscr();
@@ -93,12 +98,25 @@ int main(){
     keypad(stdscr, TRUE);
     noecho();
 
-    
     /* creates a window and draws a border */
     WINDOW * my_win = newwin(WINDOW_SIZE, WINDOW_SIZE, 0, 0);
-    box(my_win, 0 , 0);	
+    box(my_win, 0 , 0);
+
 	wrefresh(my_win);
     keypad(my_win, true);
+
+    draw_player(my_win, &player, true);
+
+
+    /* Create message window */
+    WINDOW * message_win = newwin(5, WINDOW_SIZE, WINDOW_SIZE, 0);
+    box(message_win, 0 , 0);
+    wrefresh(message_win);
+
+    /* Print player HP */
+    mvwprintw(message_win, 1, 1, "%c %d", player.ch, player.hp);
+    wrefresh(message_win);
+
 
 
 
