@@ -72,6 +72,10 @@ int main()
             
             //Keep the new players information
             player_data [current_players - 1].ch = msg.player.ch;
+        if ((msg.msg_type == 0) && (current_players < 10)) { //Maximum of 10 players
+            current_players++;
+
+            player_data [current_players - 1].ch = msg.ch;
             player_data [current_players - 1].pos_x = WINDOW_SIZE/2;
             player_data [current_players - 1].pos_y = WINDOW_SIZE/2;
             player_data [current_players - 1].HP = 10;
@@ -96,6 +100,7 @@ int main()
 
         }
 
+        //Ball_information message
         //Movement message
         if(msg.msg_type == ball_movement){
 
