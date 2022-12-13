@@ -1,5 +1,6 @@
 #include "game.h"
 
+
 int main()
 {	
     player_info_t player_data [10]; //Array store all of the info of the current players in the game (10 max)
@@ -29,6 +30,8 @@ int main()
 	    exit(-1);
     }
 
+    return 0;
+
     //ncurses initialization
 	initscr();		    	
 	cbreak();				
@@ -50,6 +53,7 @@ int main()
     struct sockaddr_un client_addr;
     socklen_t client_addr_size = sizeof(struct sockaddr_un);
 
+
     message_t msg;
 
     clock_t time_init;
@@ -58,21 +62,21 @@ int main()
     while (1)
     {
         //Receive message from the clients
-        n_bytes = recvfrom(sock_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *)&client_addr, &client_addr_size);
+        n_bytes = recvfrom(sock_fd, &msg, sizeof(message_t), 0, (struct sockaddr *)&client_addr, &client_addr_size);
         
-        if (current_players != 0) {
-            time_passed = (double)(clock() - time_init) / CLOCKS_PER_SEC;
-            if (time_passed > 5.0) {
-                prizes_to_spawn = time_passed/5.0;
+        // if (current_players != 0) {
+        //     time_passed = (double)(clock() - time_init) / CLOCKS_PER_SEC;
+        //     if (time_passed > 5.0) {
+        //         prizes_to_spawn = time_passed/5.0;
 
-                for (int n; n < prizes_to_spawn; n++) {
-                    if ()
-                    prize_spawn();
-                }
+        //         for (int n; n < prizes_to_spawn; n++) {
+        //             if ()
+        //             prize_spawn();
+        //         }
 
-                time_init = clock();
-            }
-        }
+        //         time_init = clock();
+        //     }
+        // }
 
         //Check if received correct structure
         if (n_bytes!= sizeof(message_t)){
@@ -82,7 +86,7 @@ int main()
         /*Process the various types of messages*/
 
         //Connect message
-        if ((msg.msg_type == connect) && (current_players < 10)) { //Maximum of 10 players
+        if ((msg.msg_type == connection) && (current_players < 10)) { //Maximum of 10 players
 
             if (current_players == 0) {
                 time_init = clock ();
@@ -91,17 +95,22 @@ int main()
             current_players++; //Increase the number of players playing the game
             
             //Keep the new players information
-            player_data [current_players - 1].ch = msg.player.ch;
-            player_data [current_players - 1].pos_x = WINDOW_SIZE/2;
-            player_data [current_players - 1].pos_y = WINDOW_SIZE/2;
-            player_data [current_players - 1].HP = 10;
+            player_data[current_players - 1].ch = msg.player.ch;
+            player_data[current_players - 1].pos_x = WINDOW_SIZE/2;
+            player_data[current_players - 1].pos_y = WINDOW_SIZE/2;
+            player_data[current_players - 1].HP = 10;
 
-            player_data [current_players - 1].client_addr = client_addr;
-            player_data [current_players - 1].client_addr_size = client_addr_size;
+            player_data[current_players - 1].client_addr = client_addr;
+            player_data[current_players - 1].client_addr_size = client_addr_size;
 
+            /* draw mark on new position */
+            wmove(my_win, player_data[current_players - 1].pos_x, player_data [current_players - 1].pos_y);
+            waddch(my_win, player_data[current_players - 1].ch);
+            wrefresh(my_win);	
 
             msg.msg_type = ball_information;
-            msg.player = player_data [current_players - 1];
+            msg.player = player_data[current_players - 1];
+            msg.game_state = *my_win;
             
             //Ball_information message
             sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr, client_addr_size);
@@ -140,7 +149,7 @@ int main()
                 direction = msg.direction;
 
                 /* calculates new mark position */
-                new_position(&pos_x, &pos_y, direction);
+                // moove_player(&pos_x, &pos_y, direction);
 
                 player_data[i].pos_x = pos_x;
                 player_data[i].pos_y = pos_y;
@@ -159,8 +168,9 @@ int main()
                                 player_data [j].ch = -1;
                             }
                         }
-                    } else if (/*chocar com um prize*/){
                     }
+                    // else if (/*chocar com um prize*/){
+                    // }
                 }
                 
                 /* draw mark on new position */
@@ -169,8 +179,8 @@ int main()
                 wrefresh(my_win);	
 
                 //Field_status message
-                msg_type = field_status;
-                msg.game_status = &my_win;
+                msg.msg_type = field_status;
+                msg.game_state = *my_win;
                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr, client_addr_size);
                 
                 found = 0;
