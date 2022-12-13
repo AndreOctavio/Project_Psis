@@ -159,8 +159,8 @@ int main()
             wrefresh(my_win);	
 
             msg.msg_type = ball_information;
-            msg.player = player_data[i];
-            msg.game_state = *my_win;
+            msg.player = player_data;
+            msg.player_num = i;
             
             //Ball_information message
             sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr, client_addr_size);
@@ -175,15 +175,12 @@ int main()
 
         }
 
-        //Ball_information message
         //Movement message
         if(msg.msg_type == ball_movement){
 
-            for (i = 0; i < 10; i++) {
-                if (player_data[i].ch == msg.player.ch){
-                    found = 1;
-                    break;
-                }
+            if (player_data[i].ch == msg.player[msg.player_num].ch){
+                found = 1;
+                break;
             }
 
             if (found) {
@@ -233,7 +230,7 @@ int main()
 
                 //Field_status message
                 msg.msg_type = field_status;
-                msg.game_state = *my_win;
+                msg.player = player_data;
                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr, client_addr_size);
                 
                 found = 0;
@@ -242,18 +239,8 @@ int main()
 
         //Disconnect message
         if (msg.msg_type = disconnect) {
-
-            for (i = 0; i < 10; i++) {
-
-                if (player_data[i].ch == msg.player.ch){
-                    player_data [i].ch = -1;
-                    break;
-                }
-
-            }
-
+            player_data [msg.player_num].ch = -1;
         }
-        
         
     }
   	endwin();			/* End curses mode		  */
