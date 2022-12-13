@@ -10,7 +10,7 @@
 #define WINDOW_SIZE 20
 #define SOCKET_NAME "/tmp/sock_game"
 
-typedef enum msg_type_t {connect, ball_information, ball_movement, field_status, health_0, disconnect} msg_type_t;
+typedef enum msg_type_t {connect, ball_information, ball_movement, field_status, health_0, disconnect, lobby_full} msg_type_t;
 typedef enum direction_t {UP, DOWN, LEFT, RIGHT} direction_t;
 
 /*Structure to store player's information*/
@@ -21,10 +21,9 @@ typedef struct player_info_t
     int HP;
 } player_info_t;
 
-/* Message Structure */
 typedef struct message_t
 {   
     msg_type_t msg_type; 
-    char ch; 
+    player_info_t player;
     direction_t direction;
 } message_t;
