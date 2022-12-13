@@ -19,7 +19,7 @@ int main()
 
     //Check for it was sucessfully created
     if (sock_fd == -1){ 
-	    perror("socket: ");
+	    perror("socket: l");
 	    exit(-1);
     }
 
