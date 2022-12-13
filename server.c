@@ -1,12 +1,4 @@
-#include <stdlib.h>
-#include <ncurses.h>
-#include "remote-char.h"
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>  
-#include <sys/socket.h>
-#include <sys/un.h>
+#include "game.h"
 
 int main()
 {	
@@ -55,35 +47,43 @@ int main()
     struct sockaddr_un client_addr;
     socklen_t client_addr_size = sizeof(struct sockaddr_un);
 
-    remote_player_t msg;
+    message_t msg;
 
     while (1)
     {
         //Receive message from the clients
-        n_bytes = recvfrom(sock_fd, &msg, sizeof(remote_player_t), 0, (const struct sockaddr *)&client_addr, &client_addr_size);
+        n_bytes = recvfrom(sock_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *)&client_addr, &client_addr_size);
         
         //Check if received correct structure
-        if (n_bytes!= sizeof(remote_player_t)){
+        if (n_bytes!= sizeof(message_t)){
             continue;
         }
         
         /*Process the various types of messages*/
 
         //Connect message
-        if ((msg.msg_type == 0) && (current_players < 10)) { //Maximum of 10 players
+        if ((msg.msg_type == connect) && (current_players < 10)) { //Maximum of 10 players
             current_players++;
 
             player_data [current_players - 1].ch = msg.ch;
             player_data [current_players - 1].pos_x = WINDOW_SIZE/2;
             player_data [current_players - 1].pos_y = WINDOW_SIZE/2;
+            player_data [current_players - 1].HP = 10;
+
+            msg.msg_type = ball_information;
+            msg.player = player_data [current_players - 1];
+            
+            //Ball_information message
+            sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr, client_addr_size);
 
         } else if (current_players == 10){ //Already 10 players in the game
 
-            /*send a message saying the lobby is full*/
+            msg.msg_type = lobby_full;
+            sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr, client_addr_size);
+            continue;
 
         }
 
-        //Ball_information message
         //Movement message
         if(msg.msg_type == 1){
             //STEP 4
