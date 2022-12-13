@@ -21,15 +21,18 @@ typedef struct player_info_t
     int pos_x, pos_y;
     int HP;
 
-    struct sockaddr_un client_addr;
-    socklen_t client_addr_size;
 } player_info_t;
 
 typedef struct message_t
 {   
     msg_type_t msg_type; 
     player_info_t player;
-    WINDOW game_state;
-    WINDOW message_win;
     direction_t direction;
 } message_t;
+
+typedef struct field_status_t
+{   
+    msg_type_t msg_type;
+    player_info_t player[10];
+
+} field_status_t;
