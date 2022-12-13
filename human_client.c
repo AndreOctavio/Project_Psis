@@ -125,15 +125,15 @@ int main(){
     while(key != 27 && key!= 'q'){
         key = wgetch(my_win);
 
-        msg.msg_type = ball_movement;
 
         if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN){
-            msg.player[msg.player_num] = player;
+
+            msg.msg_type = ball_movement;
             msg.direction = key;
+            msg.player[msg.player_num] = player;
 
             /* Send message to server */
             n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
-
             if (n_bytes!= sizeof(message_t)){
                 perror("write");
                 exit(-1);
@@ -141,18 +141,22 @@ int main(){
 
             /* Receive message from server */
             n_bytes = recv(socket_fd, &msg, sizeof(message_t), 0);
-
             if (n_bytes!= sizeof(message_t)){
                 perror("read");
                 exit(-1);
             }
 
             if(msg.msg_type == field_status){
-
+                wclear();
+                box(my_win, 0 , 0);
+                for(int i; i < 10, i++){
+                    if(i != -1){
+                        /* Draw all the players */
+                        draw_player(my_win, &player, 1);
+                    }
+                }
             }
             
-            /* Draw player */
-            draw_player(my_win, &player, 1);
 
             mvwprintw(message_win, 1,1,"%c key pressed", key);
             wrefresh(message_win);	
