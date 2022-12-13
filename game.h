@@ -30,5 +30,6 @@ typedef struct message_t
     msg_type_t msg_type; 
     player_info_t player;
     WINDOW game_state;
+    WINDOW message_win;
     direction_t direction;
 } message_t;

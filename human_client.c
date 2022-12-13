@@ -1,5 +1,22 @@
 #include "game.h"
 
+WINDOW * message_win;
+
+
+void draw_player(WINDOW *win, player_info_t * player, int delete){
+    int ch;
+    if(delete){
+        ch = player->ch;
+    }else{
+        ch = ' ';
+    }
+    int p_x = player->x;
+    int p_y = player->y;
+    wmove(win, p_y, p_x);
+    waddch(win,ch);
+    wrefresh(win);
+}
+
 
 int main(){
 
@@ -74,10 +91,50 @@ int main(){
     WINDOW * my_win = newwin(WINDOW_SIZE, WINDOW_SIZE, 0, 0);
     box(my_win, 0 , 0);
     wrefresh(my_win);
+    keypad(my_win, true);
+    /* creates a window and draws a border */
+    message_win = newwin(5, WINDOW_SIZE, WINDOW_SIZE, 0);
+    box(message_win, 0 , 0);	
+	wrefresh(message_win);
 
-    /* Information about the character */
-    int ch, pos_x, pos_y;
-    direction_t  direction;
+
+    /* Playing loop */
+    int key = -1;
+    while(key != 27 && key!= 'q'){
+        key = wgetch(my_win);
+
+        msg.msg_type = ball_movement;
+
+        if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN){
+            msg.player = player;
+            msg.direction = key;
+
+            /* Send message to server */
+            n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
+
+            if (n_bytes!= sizeof(message_t)){
+                perror("write");
+                exit(-1);
+            }
+
+            /* Receive message from server */
+            n_bytes = recv(socket_fd, &msg, sizeof(message_t), 0);
+
+            if (n_bytes!= sizeof(message_t)){
+                perror("read");
+                exit(-1);
+            }
+            
+            my_win = &msg.game_state;
+            wrefresh(my_win);
+
+            mvwprintw(&msg.message_win, 1,1,"%c key pressed", key);
+            wrefresh(&msg.message_win);	
+
+        }
+
+
+    }
 
 
     close(socket_fd);
