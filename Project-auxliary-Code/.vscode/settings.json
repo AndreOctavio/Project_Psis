@@ -1,0 +1,9 @@
+{
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/home/jnos/SYNC-Folder/CurrentWork/Docencia/22-23/2-PSis/Projecto/Parte-A/Project-auxliary-Code",
+            "binaryPath": "/home/jnos/SYNC-Folder/CurrentWork/Docencia/22-23/2-PSis/Projecto/Parte-A/Project-auxliary-Code/chase-client",
+            "binaryArgs": []
+        }
+    ]
+}
