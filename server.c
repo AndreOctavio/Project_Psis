@@ -64,8 +64,6 @@ void find_empty (int * x, int * y, player_info_t players[10], player_info_t bots
     }
 }
 
-
-
 int main()
 {	
     player_info_t player_data [10]; // Array to store all of the info of the current players in the game (10 max)
@@ -142,21 +140,6 @@ int main()
         if (n_bytes!= sizeof(message_t)){
             continue;
         }
-        
-        // if (current_players != 0) {
-        //     time_passed = (double)(clock() - time_init) / CLOCKS_PER_SEC;
-        //     if (time_passed > 5.0) {
-        //         prizes_to_spawn = time_passed/5.0;
-
-        //         // for (int n; n < prizes_to_spawn; n++) {
-        //         //     if ()
-        //         //     prize_spawn();
-        //         // }
-
-        //         time_init = clock();
-        //     }
-        // }
-
         
         /*------PROCESS THE VARIOUS TYPES OF MESSAGES------*/
 
@@ -238,11 +221,7 @@ int main()
         if(msg.msg_type == ball_movement){
 
             // Check if the client sending the message is in fact a player in the game
-            if (player_data[msg.player_num].ch == msg.player[msg.player_num].ch){ 
-                found = 1;
-            }
-
-            if (found) {
+            if (player_data[msg.player_num].ch == msg.player[msg.player_num].ch) {
                 
                 // Save the old position
                 pos_x = player_data[msg.player_num].pos_x;
@@ -251,7 +230,7 @@ int main()
                 // Calculate the new position
                 moove_player(&player_data[msg.player_num], msg.direction);
 
-                /* Check if the player hit another player */
+                //Check if the player hit another player or a bot
                 for(int j = 0 ; j < 10; j++){
 
                     // Check if the position in the array has a player (different then the player moving)
@@ -274,12 +253,23 @@ int main()
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
                                 player_data [j].ch = -1;
 
-                            } else if (player_data [j].hp > 0) { /*If the player that was hit still has lives then the */
-                                clear_to_move = 0;               /* player moving can't go into those coordenates */
-                            }
+                            } 
+
+                            clear_to_move = 0;
 
                             break;
                         }
+                    }
+
+                    // Look for a bot
+                    if (bot_data[j].ch != -1) {
+
+                        //Player hits a bot
+                        if (bot_data[j].pos_x == player_data[msg.player_num].pos_x && player_data[j].pos_y == player_data[msg.player_num].pos_y){
+                            clear_to_move = 0;
+                            break;
+                        } 
+
                     }
                     // else if (/*chocar com um prize*/){
                     // }
@@ -307,17 +297,79 @@ int main()
 
                 for (i = 0; i < 10; i++) { //Copy the current player data
                     msg.player[i] = player_data[i];
+                    msg.bots[i] = bot_data[i];
                 }
-
-                // mvwprintw(message_win, 1, 1, "                  ");
-                // mvwprintw(message_win, 1, 1, "sending");
-                // wrefresh(message_win);
-                // sleep(0.5);
 
                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[msg.player_num], client_addr_size);
 
-                found = 0;
-                clear_to_move = 1;
+                clear_to_move = 1; 
+
+            } else if (bot_data[msg.player_num].ch == msg.bots[msg.player_num].ch){
+
+                // Save the old position
+                pos_x = bot_data[msg.player_num].pos_x;
+                pos_y = bot_data[msg.player_num].pos_y;
+
+                // Calculate the new position
+                moove_player(&bot_data[msg.player_num], msg.direction);
+
+                //Check if the bot hit another player or a bot
+                for(int j = 0 ; j < 10; j++){
+
+                    // Check if the position in the array has a player
+                    if(player_data[j].ch != -1) {
+                        
+                        // See if the player is in the position that the bot is moving into
+                        if (player_data[j].pos_x == bot_data[msg.player_num].pos_x && player_data[j].pos_y == bot_data[msg.player_num].pos_y){ //Bot hits another player
+
+                            player_data [j].hp--; // Decrease HP of the player that was hit
+
+                            if (player_data [j].hp == 0) { // If the player that was hit has 0 lives than its GAME OVER
+
+                                /* HEALTH_0 MESSAGE */
+                                msg.msg_type = health_0;
+                                sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
+                                player_data [j].ch = -1;
+
+                            } 
+
+                            clear_to_move = 0;
+
+                            break;
+                        }
+                    }
+
+                    // Look for a bot
+                    if ((bot_data[j].ch != -1) && (bot_data[j].ch != msg.bots[msg.player_num].ch)) {
+
+                        // Bot hits a bot
+                        if (bot_data[j].pos_x == bot_data[msg.player_num].pos_x && bot_data[j].pos_y == bot_data[msg.player_num].pos_y){
+                            clear_to_move = 0;
+                            break;
+                        } 
+
+                    }
+                    // else if (/*chocar com um prize*/){
+                    // }
+                }
+
+                if (clear_to_move) {
+
+                    // Delete bot from old position
+                    wmove(my_win, pos_y, pos_x);
+                    waddch(my_win,' ');
+
+                    // Draw bot in the new position
+                    wmove(my_win, bot_data[msg.player_num].pos_y, bot_data[msg.player_num].pos_x);
+                    waddch(my_win, bot_data[msg.player_num].ch);
+                    wrefresh(my_win);	
+
+                } else { // Keep the old coordenates
+        
+                    bot_data[msg.player_num].pos_x = pos_x;
+                    bot_data[msg.player_num].pos_y = pos_y;
+                }
+                
             }
         }
 
