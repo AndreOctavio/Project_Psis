@@ -24,14 +24,20 @@ int generate_direction(){
 int main(int argc, char * argv[]){
 
     int socket_fd, bot_id;
-    int num_bots = argv[2];
-    char * socket_name = argv[1];
+    int num_bots;
+    //char * socket_name = argv[2];
     char character = '*';
 
     struct sockaddr_un local_client_addr;
 	struct sockaddr_un server_addr;
 
-    if(num_bots > 10){
+    num_bots = atoi(argv[1]);
+
+    if (num_bots == 0) {
+        // Error
+        perror("Invalid number of bots");
+        exit(-1);
+    } else if (num_bots > 10) {
         printf("The maximum number of bots is 10\nExiting...\n");
         exit(-1);
     }
@@ -61,7 +67,7 @@ int main(int argc, char * argv[]){
 
     /* Server infos */
 	server_addr.sun_family = AF_UNIX;
-	strcpy(server_addr.sun_path, socket_name);
+	strcpy(server_addr.sun_path, SOCKET_NAME);
 
     /* Set connect message */
     message_t msg;
@@ -74,6 +80,8 @@ int main(int argc, char * argv[]){
     msg.msg_type = connection;
     msg.player_num = num_bots;  // Here player_num will store the number of bots in the message
 
+    printf("sending CONETC\n");
+
     /* Send connect message to server */
     int n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
     if (n_bytes!= sizeof(message_t)){
@@ -81,12 +89,16 @@ int main(int argc, char * argv[]){
         exit(-1);
     }
 
-    while(1){
+    printf("SENT COONTE\n");
+
+    while(0){
 
         sleep(3);
 
+        printf("sending movement\n");
+
         /* Generate new bot´s movements */
-        for(int i = 0; i < num_bots; i++){
+        for(int bot_id = 0; bot_id < num_bots; bot_id++){
 
             /* Set movement message */
             msg.msg_type = ball_movement;
