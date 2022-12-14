@@ -25,13 +25,15 @@ int main(int argc, char * argv[]){
 
     int socket_fd, bot_id;
     int num_bots;
-    //char * socket_name = argv[2];
+    char socket_name[64];
     char character = '*';
 
     struct sockaddr_un local_client_addr;
 	struct sockaddr_un server_addr;
 
     num_bots = atoi(argv[1]);
+    strcpy(socket_name, argv[2]);
+    printf("Socket name: %s", socket_name);
 
     if (num_bots == 0) {
         // Error
@@ -55,7 +57,7 @@ int main(int argc, char * argv[]){
         exit(-1);
     }
 
-    sprintf(local_client_addr.sun_path, "%s_%d", SOCKET_NAME, getpid());
+    sprintf(local_client_addr.sun_path, "%s_%d", socket_name, getpid());
 
 	unlink(local_client_addr.sun_path);
 
@@ -67,7 +69,7 @@ int main(int argc, char * argv[]){
 
     /* Server infos */
 	server_addr.sun_family = AF_UNIX;
-	strcpy(server_addr.sun_path, SOCKET_NAME);
+	strcpy(server_addr.sun_path, socket_name);
 
     /* Set connect message */
     message_t msg;

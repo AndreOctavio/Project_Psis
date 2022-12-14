@@ -22,14 +22,20 @@ void draw_player(WINDOW *win, player_info_t * player, int delete){
 }
 
 
-int main(){
+int main(int argc, char *argv[]){
 
     int socket_fd;
     char character;
+    char socket_name[64];
     player_info_t player;
 
     struct sockaddr_un local_client_addr;
 	struct sockaddr_un server_addr;
+
+    if(argc != 2){
+        printf("Incorrect Arguments, please write server address\n");
+        exit(-1);
+    }
 
     /* Player selects its character */
     printf("   ***    Welcome to the game!    ***   \n");
@@ -56,15 +62,16 @@ int main(){
 	}
 
     /* Server infos */
+    strcpy(socket_name, argv[2]);
 	server_addr.sun_family = AF_UNIX;
-	strcpy(server_addr.sun_path, SOCKET_NAME);
+	strcpy(server_addr.sun_path, socket_name);
 
 
     /* Set connect message */
     message_t msg;
     msg.msg_type = connection;
-    msg.player[0] = player;
-    msg.player_num = 0;
+    msg.player[1] = player;
+    msg.player_num = 1;
 
 
     /* Send connect message to server */
