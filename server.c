@@ -46,6 +46,9 @@ void find_empty (int * x, int * y, player_info_t players [10], player_info_t bot
     int found = 0;
 
     while (!found) {
+
+        found = 1;
+
         /* Use current time as
         seed for random generator */
         srand(time(0));
@@ -167,16 +170,37 @@ int main()
         /* CONNECT MESSAGE */
         if ((msg.msg_type == connection) && ((current_players < 10) || (msg.bots[0].ch == '*'))) { // Maximum of 10 players
 
+            // mvwprintw(message_win, 1, 1, "                  ");
+            // mvwprintw(message_win, 1, 1, "bot_connect --- %d", msg.player_num);
+            // wrefresh(message_win);
+            // sleep(2);
+
             while (msg.player_num != 0) {
+
+                // mvwprintw(message_win, 1, 1, "                  ");
+                // mvwprintw(message_win, 1, 1, "entered loop");
+                // wrefresh(message_win);
+                // sleep(2);
+
                 find_empty (&pos_x, &pos_y, player_data, bot_data);
 
-                if (msg.player[0].ch == '*') {
+                // mvwprintw(message_win, 1, 1, "                  ");
+                // mvwprintw(message_win, 1, 1, "exit find empty");
+                // wrefresh(message_win);
+                // sleep(2);
+
+                if (msg.bots[0].ch == '*') {
 
                     bot_data[msg.player_num].ch = '*';
                     bot_data[msg.player_num].pos_x = pos_x;
                     bot_data[msg.player_num].pos_y = pos_y;
 
                     ch = '*';
+
+                    // mvwprintw(message_win, 1, 1, "                  ");
+                    // mvwprintw(message_win, 1, 1, "ch --- %c", ch);
+                    // wrefresh(message_win);
+                    // sleep(2);
 
                 } else {
                     for (i = 0; i < 10; i++) {
@@ -197,6 +221,11 @@ int main()
                     }
                 }
 
+                // mvwprintw(message_win, 1, 1, "                  ");
+                // mvwprintw(message_win, 1, 1, "out of loop...drawing -- %c", ch);
+                // wrefresh(message_win);
+                // sleep(2);
+
                 // Draw the player/bot
                 wmove(my_win, pos_y, pos_x);
                 waddch(my_win, ch);
@@ -213,6 +242,8 @@ int main()
 
                     /* BALL_INFORMATION MESSAGE */
                     sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &tmp, client_addr_size);
+
+                    msg.player_num = 1;
                 }
 
                 msg.player_num--;
