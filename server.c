@@ -291,6 +291,10 @@ int main()
         //Disconnect message
         if (msg.msg_type == disconnect) {
             player_data [msg.player_num].ch = -1;
+
+            /*deletes player from the screen */
+            wmove(my_win, player_data [msg.player_num].pos_y, player_data [msg.player_num].pos_x);
+            waddch(my_win,' ');
         }
 
     }
