@@ -189,6 +189,8 @@ int main(){
         }
     }
 
+    
+
     /************  GO BACK TO THE BEGINNIG  **************/
 
     endwin();
