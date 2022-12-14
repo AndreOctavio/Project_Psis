@@ -41,7 +41,7 @@ void moove_player (player_info_t * player, int direction){
     }
 }
 
-void find_empty (*x, *y, player_info_t players, player_info_t bots) {
+void find_empty (int * x, int * y, player_info_t players, player_info_t bots) {
 
     int found = 0;
 
@@ -54,7 +54,7 @@ void find_empty (*x, *y, player_info_t players, player_info_t bots) {
         &y = (rand() % 18) + 1;
 
         // Check if there's a player or bot in this coordenate
-        for (i = 0; i < 10; i++) {
+        for (int i = 0; i < 10; i++) {
             if (players[i].ch != -1) {
                 if ((players[i].pos_x == &x) && (players[i].pos_y == &y)) {
                     found = 0;
@@ -232,7 +232,7 @@ int main()
 
                     for (i = 0; i < 10; i++) { // Copy the current player data
                         msg.player[i] = player_data[i];
-                        msg.bot[i] = bot_data[i];
+                        msg.bots[i] = bot_data[i];
                     }
 
                     /* BALL_INFORMATION MESSAGE */

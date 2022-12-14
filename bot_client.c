@@ -68,7 +68,7 @@ int main(int argc, char * argv[]){
 
     /* Set bots */
     for(int i = 0; i < num_bots; i++){
-        msg.player[i].ch = '*';
+        msg.bots[i].ch = '*';
     }
 
     msg.msg_type = connection;
