@@ -28,6 +28,7 @@ typedef struct message_t
 {   
     msg_type_t msg_type; 
     player_info_t player[10];
+    player_info_t bots[10];
     int player_num;
     int direction;
 } message_t;
