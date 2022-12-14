@@ -63,9 +63,9 @@ int main(){
     /* Set connect message */
     message_t msg;
     msg.msg_type = connection;
-    msg.player[0] = player;
-    msg.player_num = 0;
-
+    msg.player[1] = player;
+    msg.player_num = 1;
+    
 
     /* Send connect message to server */
     int n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
