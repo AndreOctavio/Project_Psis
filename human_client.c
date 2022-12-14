@@ -62,7 +62,7 @@ int main(){
 
     /* Set connect message */
     message_t msg;
-    msg.msg_type = 0;
+    msg.msg_type = connection;
     msg.player[0] = player;
     msg.player_num = 0;
 
@@ -189,7 +189,14 @@ int main(){
         }
     }
 
-    
+    msg.msg_type = disconnect;
+
+    /* Send ball_movement to server */
+    n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
+    if (n_bytes!= sizeof(message_t)){
+        perror("write");
+        exit(-1);
+    }
 
     /************  GO BACK TO THE BEGINNIG  **************/
 
