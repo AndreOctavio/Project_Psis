@@ -24,29 +24,24 @@ void draw_player(WINDOW *win, player_info_t * player, int delete){
 
 int main(){
 
+    int socket_fd;
     char character;
+    player_info_t player;
+
+    struct sockaddr_un local_client_addr;
+	struct sockaddr_un server_addr;
 
     /* Player selects its character */
+    printf("   ***    Welcome to the game!    ***   \n");
     printf("Select your character and press \"Enter\": \n");
     scanf("%c", &character);
-
-    player_info_t player;
     player.ch = character;
 
-
-    /* Setup message */
-    message_t msg;
-    msg.msg_type = 0;
-    msg.player[0] = player;
-    msg.player_num = 0;
-
-
     /* Create client socket */
-    struct sockaddr_un local_client_addr;
     local_client_addr.sun_family = AF_UNIX;
-    int socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (socket_fd == -1){
-        perror("socket: ");
+        perror("socket");
         exit(-1);
     }
 
@@ -60,13 +55,16 @@ int main(){
 		exit(-1);
 	}
 
-    printf("Socket created | Ready to send | Ready to recieve\n");
-
     /* Server infos */
-	struct sockaddr_un server_addr;
 	server_addr.sun_family = AF_UNIX;
 	strcpy(server_addr.sun_path, SOCKET_NAME);
 
+
+    /* Set connect message */
+    message_t msg;
+    msg.msg_type = 0;
+    msg.player[0] = player;
+    msg.player_num = 0;
 
 
     /* Send connect message to server */
@@ -83,37 +81,32 @@ int main(){
         exit(-1);
     }
 
-    printf("Received message from server %c\n", msg.player[msg.player_num].ch); // DEBUG ---------------
-    scanf("%c", &character); // DEBUG ---------------
-
-    /* Set player's position */
-    player.pos_x = msg.player[msg.player_num].pos_x;
-    player.pos_y = msg.player[msg.player_num].pos_y;
-
+    /* Set player variable */
+    player = msg.player[msg.player_num];
 
 
     /* ncurses initialization */
-    initscr();
-    cbreak();
-    keypad(stdscr, TRUE);
-    noecho();
+    initscr();              // initialize ncurses
+    cbreak();               // disable line buffering
+    keypad(stdscr, TRUE);   // enable full keyboard mapping
+    noecho();               // disable echoing of typed characters
+
 
     /* creates a window and draws a border */
     WINDOW * my_win = newwin(WINDOW_SIZE, WINDOW_SIZE, 0, 0);
     box(my_win, 0 , 0);
-
-	wrefresh(my_win);
+	wrefresh(my_win);    // refresh the screen
     keypad(my_win, true);
-
-    draw_player(my_win, &player, true);
-
 
     /* Create message window */
     WINDOW * message_win = newwin(5, WINDOW_SIZE, WINDOW_SIZE, 0);
     box(message_win, 0 , 0);
     wrefresh(message_win);
 
-    /* Print player HP */
+    /* Draw player in main window */
+    draw_player(my_win, &player, true);
+
+    /* Print player HP in message window */
     mvwprintw(message_win, 1, 1, "%c %d", player.ch, player.hp);
     wrefresh(message_win);
 
@@ -123,59 +116,84 @@ int main(){
     /* Playing loop */
     int key = -1;
 
-
     while(key != 27 && key!= 'q'){
+
         key = wgetch(my_win);
 
-        mvwprintw(message_win, 1, 1, "                  ");
-        mvwprintw(message_win, 1, 1,"%d key1 %d", key, KEY_DOWN);
-        wrefresh(message_win);
-        sleep(0.5);
-
+        /* Checks if pressed key was movement */
         if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN){
 
+            /* Set movement message */
             msg.msg_type = ball_movement;
             msg.direction = key;
             msg.player[msg.player_num] = player;
 
-            /* Send message to server */
+            /* Send ball_movement to server */
             n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
             if (n_bytes!= sizeof(message_t)){
                 perror("write");
                 exit(-1);
             }
 
-            /* Receive message from server */
+            /* Receive field_status from server */
             n_bytes = recv(socket_fd, &msg, sizeof(message_t), 0);
             if (n_bytes!= sizeof(message_t)){
                 perror("read");
                 exit(-1);
             }
 
+            /* MESSAGE RECEIVED PROCESSING */
+
+            /* Checks if message recv is field_status */
             if(msg.msg_type == field_status){
+
                 wclear(my_win);
                 box(my_win, 0 , 0);
-                for(int i; i < 10; i++){
-                    if(i != -1){
+
+                for(int i = 0; i < 10; i++){
+                    if(msg.player[i].ch != -1){
                         /* Draw all the players */
-                        draw_player(my_win, &player, 1);
+                        draw_player(my_win, &msg.player[i], 1);
                     }
                 }
+                /* Print player HP in message window */
+                mvwprintw(message_win, 1, 1, "                  ");
+                mvwprintw(message_win, 1, 1, "%c %d", msg.player[msg.player_num].ch, msg.player[msg.player_num].hp);
+                wrefresh(message_win);
             }
-            
-            mvwprintw(message_win, 1, 1, "                  ");
-            mvwprintw(message_win, 1,1,"%d key pressed", key);
-            wrefresh(message_win);
-            sleep(0.5);
-
+            else if (msg.msg_type == lobby_full){
+                mvwprintw(message_win, 1, 1, "                  ");
+                mvwprintw(message_win, 1, 1, "The lobby is full ");
+                mvwprintw(message_win, 2, 1, "                  ");
+                mvwprintw(message_win, 2, 1, "Try Again Later   ");
+                wrefresh(message_win);
+                /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
+                sleep(5);
+                break;
+            }
+            else if (msg.msg_type == health_0){
+                /* Print player HP in message window */
+                mvwprintw(message_win, 1, 1, "                  ");
+                mvwprintw(message_win, 1, 1, "%c %d", msg.player[msg.player_num].ch, msg.player[msg.player_num].hp);
+                wrefresh(message_win);
+                sleep(1);
+                mvwprintw(message_win, 1, 1, "                  ");
+                mvwprintw(message_win, 1, 1, "    GAME OVER :(  ");
+                mvwprintw(message_win, 2, 1, "                  ");
+                mvwprintw(message_win, 2, 1, "Just get better...");
+                wrefresh(message_win);
+                /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
+                sleep(5);
+                break;
+            }
         }
-
-
     }
 
+    /************  GO BACK TO THE BEGINNIG  **************/
 
+    endwin();
     close(socket_fd);
 
-    return 0;
+    exit(0);
 
 }
