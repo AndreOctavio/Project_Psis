@@ -41,7 +41,7 @@ void moove_player (player_info_t * player, int direction){
     }
 }
 
-void find_empty (int * x, int * y, player_info_t players, player_info_t bots) {
+void find_empty (int * x, int * y, player_info_t players [10], player_info_t bots [10]) {
 
     int found = 0;
 
@@ -50,18 +50,18 @@ void find_empty (int * x, int * y, player_info_t players, player_info_t bots) {
         seed for random generator */
         srand(time(0));
 
-        &x = (rand() % 18) + 1;
-        &y = (rand() % 18) + 1;
+        *x = (rand() % 18) + 1;
+        *y = (rand() % 18) + 1;
 
         // Check if there's a player or bot in this coordenate
         for (int i = 0; i < 10; i++) {
             if (players[i].ch != -1) {
-                if ((players[i].pos_x == &x) && (players[i].pos_y == &y)) {
+                if ((players[i].pos_x == *x) && (players[i].pos_y == *y)) {
                     found = 0;
                     break;
                 }
             } else if (bots[i].ch != -1) {
-                if ((bots[i].pos_x == &x) && (bots[i].pos_y == &y)) {
+                if ((bots[i].pos_x == *x) && (bots[i].pos_y == *y)) {
                     found = 0;
                     break;
                 }
@@ -165,31 +165,7 @@ int main()
         /*------PROCESS THE VARIOUS TYPES OF MESSAGES------*/
 
         /* CONNECT MESSAGE */
-        if ((msg.msg_type == connection) && ((current_players < 10) || (msg.bot[0].ch == '*'))) { // Maximum of 10 players
-
-            // while (!found && msg.player_num) {
-
-            //     /* Use current time as
-            //     seed for random generator */
-            //     srand(time(0));
-
-            //     pos_x = (rand() % 18) + 1;
-            //     pos_y = (rand() % 18) + 1;
-                
-            //     found = 1;
-
-            //     // Check if there's a player in this coordenate
-            //     for (i = 0; i < 10; i++) {
-            //         if (player_data[i].ch != -1) {
-            //             if ((player_data[i].pos_x == pos_x) && (player_data[i].pos_y == pos_y)) {
-            //                 found = 0;
-            //                 break;
-            //             }
-            //         }
-            //     }
-            // }
-
-            //found = 0;
+        if ((msg.msg_type == connection) && ((current_players < 10) || (msg.bots[0].ch == '*'))) { // Maximum of 10 players
 
             while (msg.player_num != 0) {
                 find_empty (&pos_x, &pos_y, player_data, bot_data);
