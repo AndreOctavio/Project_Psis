@@ -2,15 +2,6 @@
 
 WINDOW * message_win;
 
-void initialization (struct sockaddr_un client_addr [10], player_info_t players [10], player_info_t bots [10]) {
-
-    for (int i = 0; i < 10; i++) {
-        //client_addr [i] = NULL; //se não funcionar usar NULL
-        players [i].ch = -1;
-        bots [i].ch = -1;
-    }
-}
-
 /* moove_player : 
 * Function that updates the coordenates of 
 * a player with a given direction; 
@@ -41,34 +32,34 @@ void moove_player (player_info_t * player, int direction){
     }
 }
 
-void find_empty (int * x, int * y, player_info_t players [10], player_info_t bots [10]) {
+void find_empty (int * x, int * y, player_info_t players[10], player_info_t bots[10], WINDOW * message_win) {
 
     int found = 0;
 
     while (!found) {
-
         found = 1;
 
-        /* Use current time as
-        seed for random generator */
-        srand(time(0));
+
+        /* Use current time as seed for random generator */
+        srand(clock());
 
         *x = (rand() % 18) + 1;
         *y = (rand() % 18) + 1;
 
         // Check if there's a player or bot in this coordenate
         for (int i = 0; i < 10; i++) {
-            if (players[i].ch != -1) {
-                if ((players[i].pos_x == *x) && (players[i].pos_y == *y)) {
-                    found = 0;
-                    break;
-                }
-            } else if (bots[i].ch != -1) {
+            if (bots[i].ch != -1) {
                 if ((bots[i].pos_x == *x) && (bots[i].pos_y == *y)) {
                     found = 0;
                     break;
                 }
             }
+            if (players[i].ch != -1) {
+                if ((players[i].pos_x == *x) && (players[i].pos_y == *y)) {
+                    found = 0;
+                    break;
+                }
+            } 
         }
     }
 }
@@ -83,10 +74,13 @@ int main()
     struct sockaddr_un client_addr [10]; // Array to store the players addresses
     socklen_t client_addr_size = sizeof(struct sockaddr_un);
 
-    initialization (client_addr, player_data, bot_data);
+    for (int i = 0; i < 10; i++) {
+        player_data[i].ch = -1;
+        bot_data[i].ch = -1;
+    }
 
     int current_players = 0; // Keeps the current amount of players in the game
-    int i, found = 0, clear_to_move = 1;
+    int i, found = 0, clear_to_move = 1, cnt = 0;
 
     // Create the socket for the server
     int sock_fd;
@@ -145,6 +139,9 @@ int main()
 
         // Receive message from the clients
         n_bytes = recvfrom(sock_fd, &msg, sizeof(message_t), 0, (struct sockaddr *)&tmp, &client_addr_size);
+        if (n_bytes!= sizeof(message_t)){
+            continue;
+        }
         
         // if (current_players != 0) {
         //     time_passed = (double)(clock() - time_init) / CLOCKS_PER_SEC;
@@ -160,35 +157,19 @@ int main()
         //     }
         // }
 
-        // Check if received correct structure
-        if (n_bytes!= sizeof(message_t)){
-            continue;
-        }
         
         /*------PROCESS THE VARIOUS TYPES OF MESSAGES------*/
 
         /* CONNECT MESSAGE */
         if ((msg.msg_type == connection) && ((current_players < 10) || (msg.bots[0].ch == '*'))) { // Maximum of 10 players
 
-            // mvwprintw(message_win, 1, 1, "                  ");
-            // mvwprintw(message_win, 1, 1, "bot_connect --- %d", msg.player_num);
-            // wrefresh(message_win);
-            // sleep(2);
-
+            /* Iterate through bots or do once if human player */
             while (msg.player_num != 0) {
 
-                // mvwprintw(message_win, 1, 1, "                  ");
-                // mvwprintw(message_win, 1, 1, "entered loop");
-                // wrefresh(message_win);
-                // sleep(2);
 
-                find_empty (&pos_x, &pos_y, player_data, bot_data);
+                find_empty (&pos_x, &pos_y, player_data, bot_data, message_win);
 
-                // mvwprintw(message_win, 1, 1, "                  ");
-                // mvwprintw(message_win, 1, 1, "exit find empty");
-                // wrefresh(message_win);
-                // sleep(2);
-
+                /* If the client is a bot */
                 if (msg.bots[0].ch == '*') {
 
                     bot_data[msg.player_num].ch = '*';
@@ -197,41 +178,34 @@ int main()
 
                     ch = '*';
 
-                    // mvwprintw(message_win, 1, 1, "                  ");
-                    // mvwprintw(message_win, 1, 1, "ch --- %c", ch);
-                    // wrefresh(message_win);
-                    // sleep(2);
-
+                /* If the client is a player */
                 } else {
                     for (i = 0; i < 10; i++) {
                         if (player_data[i].ch == -1) { // Get the first avaiable space in the array
-                        player_data[i].ch = msg.player[msg.player_num].ch;
+                            player_data[i].ch = msg.player[msg.player_num].ch;
 
-                        player_data[i].pos_x = pos_x;
-                        player_data[i].pos_y = pos_y;
-                        player_data[i].hp = 10;
+                            player_data[i].pos_x = pos_x;
+                            player_data[i].pos_y = pos_y;
+                            player_data[i].hp = 10;
 
-                        client_addr [i] = tmp;
+                            client_addr [i] = tmp;
 
-                        current_players++; // Increase the number of players playing the game
-                        ch = player_data[i].ch;
+                            current_players++; // Increase the number of players playing the game
+                            ch = player_data[i].ch;
 
-                        break;
+                            break;
                         }
                     }
                 }
-
-                // mvwprintw(message_win, 1, 1, "                  ");
-                // mvwprintw(message_win, 1, 1, "out of loop...drawing -- %c", ch);
-                // wrefresh(message_win);
-                // sleep(2);
 
                 // Draw the player/bot
                 wmove(my_win, pos_y, pos_x);
                 waddch(my_win, ch);
                 wrefresh(my_win);	
 
+                /* If the client is a player send ball_information message */
                 if (ch != '*') {
+
                     msg.msg_type = ball_information;
                     msg.player_num = i;
 
@@ -247,7 +221,7 @@ int main()
                 }
 
                 msg.player_num--;
-                
+
             }
 
         } else if (current_players == 10 && msg.msg_type == connection) { //Already 10 players in the game
@@ -271,23 +245,11 @@ int main()
             if (found) {
                 
                 // Save the old position
-                pos_x =  player_data[msg.player_num].pos_x;
-                pos_y =  player_data[msg.player_num].pos_y;
-
-                /* Print player HP */
-                mvwprintw(message_win, 1, 1, "                  ");
-                mvwprintw(message_win, 1, 1, "b4_mv %d %d %d", player_data[msg.player_num].pos_x, player_data[msg.player_num].pos_y, msg.direction);
-                wrefresh(message_win);
-                sleep(0.5);
+                pos_x = player_data[msg.player_num].pos_x;
+                pos_y = player_data[msg.player_num].pos_y;
 
                 // Calculate the new position
                 moove_player(&player_data[msg.player_num], msg.direction);
-
-                /* Print player HP */
-                mvwprintw(message_win, 1, 1, "                  ");
-                mvwprintw(message_win, 1, 1, "af_mv %d %d", player_data[msg.player_num].pos_x, player_data[msg.player_num].pos_y);
-                wrefresh(message_win);
-                sleep(0.5);
 
                 /* Check if the player hit another player */
                 for(int j = 0 ; j < 10; j++){
@@ -298,7 +260,7 @@ int main()
                         // See if the player is in the position that our current player is moving into
                         if (player_data[j].pos_x == player_data[msg.player_num].pos_x && player_data[j].pos_y == player_data[msg.player_num].pos_y){ //Player hits another player
 
-                             // If the player has less(or equal to) than 9 lives increment HP
+                            // If the player has less(or equal to) than 9 lives increment HP
                             if (player_data [msg.player_num].hp <= 9) {
                                 player_data [msg.player_num].hp++;
                             }
@@ -347,11 +309,10 @@ int main()
                     msg.player[i] = player_data[i];
                 }
 
-                /* Print player HP */
-                mvwprintw(message_win, 1, 1, "                  ");
-                mvwprintw(message_win, 1, 1, "sending");
-                wrefresh(message_win);
-                sleep(0.5);
+                // mvwprintw(message_win, 1, 1, "                  ");
+                // mvwprintw(message_win, 1, 1, "sending");
+                // wrefresh(message_win);
+                // sleep(0.5);
 
                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[msg.player_num], client_addr_size);
 

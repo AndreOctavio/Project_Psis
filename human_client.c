@@ -26,7 +26,7 @@ int main(int argc, char *argv[]){
 
     int socket_fd;
     char character;
-    char socket_name[64];
+    //char socket_name[64];
     player_info_t player;
 
     struct sockaddr_un local_client_addr;
@@ -41,6 +41,7 @@ int main(int argc, char *argv[]){
     printf("   ***    Welcome to the game!    ***   \n");
     printf("Select your character and press \"Enter\": \n");
     scanf("%c", &character);
+    printf("Socket name:");
     player.ch = character;
 
     /* Create client socket */
@@ -52,6 +53,7 @@ int main(int argc, char *argv[]){
     }
 
     sprintf(local_client_addr.sun_path, "%s_%d", SOCKET_NAME, getpid());
+    //printf("Socket name: %s", socket_name);
 
 	unlink(local_client_addr.sun_path);
 
@@ -62,9 +64,10 @@ int main(int argc, char *argv[]){
 	}
 
     /* Server infos */
-    strcpy(socket_name, argv[2]);
+    //printf("Socket name: %s", socket_name);
+    //strcpy(socket_name, argv[2]);
 	server_addr.sun_family = AF_UNIX;
-	strcpy(server_addr.sun_path, socket_name);
+	strcpy(server_addr.sun_path, SOCKET_NAME);
 
 
     /* Set connect message */

@@ -1,3 +1,5 @@
-client
-serv
+human_client
+server
 bot
+.vscode
+.gitignore
