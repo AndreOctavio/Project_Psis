@@ -141,8 +141,8 @@ int main()
                 // seed for random generator
                 srand(time(0));
 
-                pos_x = (rand() % 19) + 1;
-                pos_y = (rand() % 19) + 1;
+                pos_x = (rand() % 18) + 1;
+                pos_y = (rand() % 18) + 1;
                 
                 found = 1;
 
@@ -284,6 +284,7 @@ int main()
                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[msg.player_num], client_addr_size);
 
                 found = 0;
+                clear_to_move = 1;
             }
         }
 
