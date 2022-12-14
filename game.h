@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <ncurses.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -28,5 +29,5 @@ typedef struct message_t
     msg_type_t msg_type; 
     player_info_t player[10];
     int player_num;
-    direction_t direction;
+    int direction;
 } message_t;

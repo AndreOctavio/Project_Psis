@@ -122,9 +122,15 @@ int main(){
 
     /* Playing loop */
     int key = -1;
+
+
     while(key != 27 && key!= 'q'){
         key = wgetch(my_win);
 
+        mvwprintw(message_win, 1, 1, "                  ");
+        mvwprintw(message_win, 1, 1,"%d key1 %d", key, KEY_DOWN);
+        wrefresh(message_win);
+        sleep(0.5);
 
         if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN){
 
@@ -157,9 +163,10 @@ int main(){
                 }
             }
             
-
-            mvwprintw(message_win, 1,1,"%c key pressed", key);
-            wrefresh(message_win);	
+            mvwprintw(message_win, 1, 1, "                  ");
+            mvwprintw(message_win, 1,1,"%d key pressed", key);
+            wrefresh(message_win);
+            sleep(0.5);
 
         }
 
