@@ -47,7 +47,7 @@ int main()
     initialization (client_addr, player_data);
 
     int current_players = 0; //Keeps the current amount of players in the game
-    int i, found = 0, clear = 0;
+    int i, found = 0, clear_to_move = 1;
 
     //Create the socket for the server
     int sock_fd;
@@ -93,8 +93,6 @@ int main()
     int n_bytes;
     int prizes_to_spawn;
 
-    int  direction;
-
     message_t msg;
 
     clock_t time_init;
@@ -137,21 +135,28 @@ int main()
                 time_init = clock ();
             }
 
-            while (!clear) {
-                pos_x = rand() % 21;
-                pos_y = rand() % 21;
+            while (!found) {
+
+                // Use current time as
+                // seed for random generator
+                srand(time(0));
+
+                pos_x = (rand() % 19) + 1;
+                pos_y = (rand() % 19) + 1;
                 
-                clear = 1;
+                found = 1;
 
                 for (i = 0; i < 10; i++) {
                     if (player_data[i].ch != -1) {
                         if ((player_data[i].pos_x == pos_x) && (player_data[i].pos_y == pos_y)) {
-                            clear = 0;
+                            found = 0;
                             break;
                         }
                     }
                 }
             }
+
+            found = 0;
 
             current_players++; //Increase the number of players playing the game
             
@@ -204,25 +209,17 @@ int main()
 
             if (found) {
 
-                ch = player_data[msg.player_num].ch;
                 pos_x =  player_data[msg.player_num].pos_x;
                 pos_y =  player_data[msg.player_num].pos_y;
 
-                /*deletes old place */
-                wmove(my_win, pos_y, pos_x);
-                waddch(my_win,' ');
-
-                /* calculates new direction */
-                direction = msg.direction;
-
                 /* Print player HP */
                 mvwprintw(message_win, 1, 1, "                  ");
-                mvwprintw(message_win, 1, 1, "b4_mv %d %d %d", player_data[msg.player_num].pos_x, player_data[msg.player_num].pos_y, direction);
+                mvwprintw(message_win, 1, 1, "b4_mv %d %d %d", player_data[msg.player_num].pos_x, player_data[msg.player_num].pos_y, msg.direction);
                 wrefresh(message_win);
                 sleep(0.5);
 
                 /* calculates new mark position */
-                moove_player(&player_data[msg.player_num], direction);
+                moove_player(&player_data[msg.player_num], msg.direction);
 
                 /* Print player HP */
                 mvwprintw(message_win, 1, 1, "                  ");
@@ -230,13 +227,10 @@ int main()
                 wrefresh(message_win);
                 sleep(0.5);
 
-                // player_data[msg.player_num].pos_x = pos_x;
-                // player_data[msg.player_num].pos_y = pos_y;
-
                 //Check if it the player hit another player
                 for(int j = 0 ; j < 10; j++){
                     if((player_data[j].ch != -1) && (j != msg.player_num)) {
-                        if (player_data[j].pos_x == pos_x && player_data[j].pos_y == pos_y){ //Player hits another player
+                        if (player_data[j].pos_x == player_data[msg.player_num].pos_x && player_data[j].pos_y == player_data[msg.player_num].pos_y){ //Player hits another player
                             if (player_data [msg.player_num].hp <= 9) { //If the player has less(or equal to) than 9 lives increment HP
                                 player_data [msg.player_num].hp++;
                             }
@@ -248,18 +242,32 @@ int main()
                                 msg.msg_type = health_0;
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
                                 player_data [j].ch = -1;
+
+                            } else if (player_data [j].hp > 0) {
+                                clear_to_move = 0;
                             }
+
+                            break;
                         }
                     }
                     // else if (/*chocar com um prize*/){
                     // }
                 }
-                
-                /* draw mark on new position */
-                wmove(my_win, player_data[msg.player_num].pos_y, player_data[msg.player_num].pos_x);
-                waddch(my_win, ch);
-                wrefresh(my_win);	
 
+                if (clear_to_move) {
+                    /*deletes old place */
+                    wmove(my_win, pos_y, pos_x);
+                    waddch(my_win,' ');
+
+                    /* draw mark on new position */
+                    wmove(my_win, player_data[msg.player_num].pos_y, player_data[msg.player_num].pos_x);
+                    waddch(my_win, player_data[msg.player_num].ch);
+                    wrefresh(my_win);	
+                } else { //keep the old coordenates
+                    player_data[msg.player_num].pos_x = pos_x;
+                    player_data[msg.player_num].pos_y = pos_y;
+                }
+                
                 //Field_status message
                 msg.msg_type = field_status;
 
