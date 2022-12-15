@@ -181,7 +181,7 @@ int main()
     int pos_x, pos_y;
     char ch;
     int n_bytes;
-    int spawn_prizes = 1;
+    int spawn_prizes = 1, n_prizes = 0;
 
     message_t msg;
 
@@ -225,6 +225,8 @@ int main()
                             wmove(my_win, pos_y, pos_x);
                             waddch(my_win, prize_data[i].ch);
                             wrefresh(my_win);
+
+                            n_prizes++;
                         }
 
                         spawn_prizes = 0;
@@ -288,6 +290,8 @@ int main()
                 msg.player_num--;
 
             }
+
+            show_all_health(message_win, player_data);
 
         } else if (current_players == 10 && msg.msg_type == connection) { //Already 10 players in the game
 
@@ -378,6 +382,7 @@ int main()
                             }
                             
                             prize_data[j].ch = -1;
+                            n_prizes--;
 
                             break;
                         } 
@@ -502,6 +507,36 @@ int main()
                 
             }
             show_all_health(message_win, player_data);
+        }
+
+        /* PRIZE_SPAWN MESSAGE */
+        if (msg.msg_type == prize_spawn) {
+
+            if (n_prizes < 10) {
+                
+                for (i = 0; i < 10; i++) {
+                    
+                    if (prize_data[i].ch == -1) {
+
+                        find_empty (&pos_x, &pos_y, player_data, bot_data, prize_data);
+
+                        prize_data[i].ch = msg.prizes[0].ch;
+                        prize_data[i].hp = msg.prizes[0].hp;
+
+                        prize_data[i].pos_x = pos_x;
+                        prize_data[i].pos_y = pos_y;
+
+                        // Draw prize
+                        wmove(my_win, pos_y, pos_x);
+                        waddch(my_win, prize_data[i].ch);
+                        wrefresh(my_win);
+
+                        n_prizes++;
+
+                        break;
+                    }
+                }
+            }
         }
 
         /* DISCONNECT MESSAGE */
