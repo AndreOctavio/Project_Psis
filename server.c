@@ -103,15 +103,16 @@ char ch_checker (char character, player_info_t players[10]) {
  */
 void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 
-    int i;
+    int i, j = 0;
 
-    for(i = 1; i < 7; i++){
+    for(i = 1; i < 6; i++){
         mvwprintw(message_win, i, 1, "                  ");
     }
 
     for (i = 0; i < 10; i++){
         if (player_data[i].ch != -1){
-            mvwprintw(message_win, i % 6, i / 6 * 11, "%c-> %d ", player_data[i].ch, player_data[i].hp);
+            mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c-> %d ", player_data[i].ch, player_data[i].hp);
+            j++;
         }
     }
     wrefresh(message_win);
