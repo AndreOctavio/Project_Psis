@@ -343,9 +343,17 @@ int main()
 
                         // Player hits a prize
                         if ((prize_data[j].pos_x == player_data[msg.player_num].pos_x) && (prize_data[j].pos_y == player_data[msg.player_num].pos_y)){
-                            
+
                             // Increase player hp by the value of the prize
                             player_data[msg.player_num].hp += prize_data[j].hp;
+
+                            // The hp of the player must not reach values bigger than 10
+                            if (player_data[msg.player_num].hp > 10) {
+
+                                player_data[msg.player_num].hp = 10;
+
+                            }
+                            
                             prize_data[j].ch = -1;
 
                             break;
