@@ -32,7 +32,7 @@ void clear_screen(WINDOW *win){
 int main(int argc, char *argv[]){
 
     int socket_fd;
-    char character;
+    char character[64];
     //char socket_name[64];
     player_info_t player;
 
@@ -43,13 +43,20 @@ int main(int argc, char *argv[]){
         printf("Incorrect Arguments, please write server address\n");
         exit(-1);
     }
-
+    int n;
     /* Player selects its character */
     printf("   ***    Welcome to the game!    ***   \n");
     printf("Select your character and press \"Enter\": \n");
-    scanf("%c", &character);
+    scanf("%s", character);
+    while(!((character[0] > 'a' && character[0] < 'z') || (character[0] > 'A' && character[0] < 'Z'))) {
+        printf("Character must be a letter, try again: \n");
+        n = scanf(" %s", character);
+    }
+
+    
+
     printf("Socket name:");
-    player.ch = character;
+    player.ch = character[0];
 
     /* Create client socket */
     local_client_addr.sun_family = AF_UNIX;
@@ -98,6 +105,11 @@ int main(int argc, char *argv[]){
         exit(-1);
     }
 
+    if(character[0] == msg.player[1].ch){
+        print("Your Character already exists, you will be %c\n", msg.player[msg.player_num].ch);
+        sleep(2);
+    }
+
     /* Set player variable */
     player = msg.player[msg.player_num];
 
@@ -126,7 +138,6 @@ int main(int argc, char *argv[]){
     /* Print player HP in message window */
     mvwprintw(message_win, 1, 1, "%c %d", player.ch, player.hp);
     wrefresh(message_win);
-
 
 
 
