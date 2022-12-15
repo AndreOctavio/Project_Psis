@@ -94,7 +94,7 @@ int main(int argc, char * argv[]){
 
     printf("SENT COONTE\n");
 
-    while(0){
+    while(1){
 
         sleep(3);
 

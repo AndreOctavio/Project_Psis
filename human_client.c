@@ -188,7 +188,9 @@ int main(int argc, char *argv[]){
                 wrefresh(message_win);
                 /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
                 sleep(5);
-                break;
+                endwin();
+                close(socket_fd);
+                exit(0);
             }
             else if (msg.msg_type == health_0){
                 /* Print player HP in message window */
@@ -203,11 +205,15 @@ int main(int argc, char *argv[]){
                 wrefresh(message_win);
                 /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
                 sleep(5);
-                break;
+                endwin();
+                close(socket_fd);
+                exit(0);
             }
         }
     }
 
+
+    /************  GO BACK TO THE BEGINNIG  **************/
     msg.msg_type = disconnect;
 
     /* Send ball_movement to server */
@@ -216,8 +222,6 @@ int main(int argc, char *argv[]){
         perror("write");
         exit(-1);
     }
-
-    /************  GO BACK TO THE BEGINNIG  **************/
 
     endwin();
     close(socket_fd);

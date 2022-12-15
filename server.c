@@ -251,6 +251,8 @@ int main()
                                 /* HEALTH_0 MESSAGE */
                                 msg.msg_type = health_0;
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
+                                wmove(my_win, player_data [j].pos_y, player_data [j].pos_x);
+                                waddch(my_win,' ');
                                 player_data [j].ch = -1;
 
                             } 
@@ -265,7 +267,7 @@ int main()
                     if (bot_data[j].ch != -1) {
 
                         //Player hits a bot
-                        if (bot_data[j].pos_x == player_data[msg.player_num].pos_x && player_data[j].pos_y == player_data[msg.player_num].pos_y){
+                        if ((bot_data[j].pos_x == player_data[msg.player_num].pos_x) && (bot_data[j].pos_y == player_data[msg.player_num].pos_y)){
                             clear_to_move = 0;
                             break;
                         } 
@@ -329,6 +331,8 @@ int main()
                                 /* HEALTH_0 MESSAGE */
                                 msg.msg_type = health_0;
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
+                                wmove(my_win, player_data [j].pos_y, player_data [j].pos_x);
+                                waddch(my_win,' ');
                                 player_data [j].ch = -1;
 
                             } 
@@ -369,6 +373,7 @@ int main()
                     bot_data[msg.player_num].pos_x = pos_x;
                     bot_data[msg.player_num].pos_y = pos_y;
                 }
+                clear_to_move = 1;
                 
             }
         }
