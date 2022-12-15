@@ -48,7 +48,7 @@ int main(int argc, char *argv[]){
     printf("   ***    Welcome to the game!    ***   \n");
     printf("Select your character and press \"Enter\": \n");
     scanf("%s", character);
-    while(!((character[0] > 'a' && character[0] < 'z') || (character[0] > 'A' && character[0] < 'Z'))) {
+    while(!((character[0] >= 'a' && character[0] <= 'z') || (character[0] >= 'A' && character[0] <= 'Z'))) {
         printf("Character must be a letter, try again: \n");
         n = scanf(" %s", character);
     }

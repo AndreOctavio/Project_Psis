@@ -458,7 +458,7 @@ int main()
                     }
 
                     // Look for a bot
-                    if (bot_data[j].ch != -1) {
+                    if (bot_data[j].ch != -1 && j != msg.player_num) {
 
                         // Bot hits a bot
                         if (bot_data[j].pos_x == bot_data[msg.player_num].pos_x && bot_data[j].pos_y == bot_data[msg.player_num].pos_y){
