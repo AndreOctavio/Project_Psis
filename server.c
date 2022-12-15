@@ -200,7 +200,7 @@ int main()
 
                             // Draw prize
                             wmove(my_win, pos_x, pos_y);
-                            waddch(my_win, ch);
+                            waddch(my_win, prize_data[i].ch);
                             wrefresh(my_win);
                         }
 
@@ -331,15 +331,27 @@ int main()
                     // Look for a bot
                     if (bot_data[j].ch != -1) {
 
-                        //Player hits a bot
+                        // Player hits a bot
                         if ((bot_data[j].pos_x == player_data[msg.player_num].pos_x) && (bot_data[j].pos_y == player_data[msg.player_num].pos_y)){
                             clear_to_move = 0;
                             break;
                         } 
 
                     }
-                    // else if (/*chocar com um prize*/){
-                    // }
+                    
+                    if (prize_data[j].ch != -1){
+
+                        // Player hits a prize
+                        if ((prize_data[j].pos_x == player_data[msg.player_num].pos_x) && (prize_data[j].pos_y == player_data[msg.player_num].pos_y)){
+                            
+                            // Increase player hp by the value of the prize
+                            player_data[msg.player_num].hp += prize_data[j].hp;
+                            prize_data[j].ch = -1;
+
+                            break;
+                        } 
+
+                    }
                 }
 
                 if (clear_to_move) {
@@ -423,8 +435,19 @@ int main()
                         } 
 
                     }
-                    // else if (/*chocar com um prize*/){
-                    // }
+                    
+                    // Look for a prize
+                    if (prize_data[j].ch != -1){
+
+                        // Bot hits a prize
+                        if ((prize_data[j].pos_x == bot_data[msg.player_num].pos_x) && (prize_data[j].pos_y == bot_data[msg.player_num].pos_y)){
+                            
+                            clear_to_move = 0;
+                            
+                            break;
+                        } 
+
+                    }
                 }
 
                 if (clear_to_move) {
