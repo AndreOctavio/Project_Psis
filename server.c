@@ -64,6 +64,33 @@ void find_empty (int * x, int * y, player_info_t players[10], player_info_t bots
     }
 }
 
+char ch_checker (char character, player_info_t players [10]) {
+
+    int eureka = 0, lowercase;
+
+    while (!eureka) {
+
+        eureka = 1;
+
+        for (int i; i < 10; i++) {
+            if (character == players[i].ch) {
+                eureka = 0;
+
+                /* Use current time as seed for random generator */
+                srand(clock());
+
+                /* If lowercase = 0 we get an uppercase ch, if lowercase = 1 we get a lowercase ch */
+                lowercase = rand() % 2; 
+                character = (rand() % 26) + 65 + lowercase * 32;
+
+                break;
+            }
+        }
+    }
+
+    return character;
+}
+
 int main()
 {	
     player_info_t player_data [10]; // Array to store all of the info of the current players in the game (10 max)
@@ -165,7 +192,8 @@ int main()
                 } else {
                     for (i = 0; i < 10; i++) {
                         if (player_data[i].ch == -1) { // Get the first avaiable space in the array
-                            player_data[i].ch = msg.player[msg.player_num].ch;
+
+                            player_data[i].ch = ch_checker(msg.player[msg.player_num].ch, player_data);
 
                             player_data[i].pos_x = pos_x;
                             player_data[i].pos_y = pos_y;
@@ -250,6 +278,7 @@ int main()
 
                                 /* HEALTH_0 MESSAGE */
                                 msg.msg_type = health_0;
+                                msg.player[j].ch = player_data [j].ch;
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
                                 player_data [j].ch = -1;
 
@@ -328,6 +357,7 @@ int main()
 
                                 /* HEALTH_0 MESSAGE */
                                 msg.msg_type = health_0;
+                                msg.player[j].ch = player_data [j].ch;
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
                                 player_data [j].ch = -1;
 
