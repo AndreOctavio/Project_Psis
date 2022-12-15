@@ -24,13 +24,14 @@ int generate_direction(){
 int main(int argc, char * argv[]){
 
     int socket_fd, bot_id;
-    int num_bots;
+    int num_bots, elapsed_time_bots, elapsed_time_prizes;
     char socket_name[64];
     char character = '*';
 
     struct sockaddr_un local_client_addr;
 	struct sockaddr_un server_addr;
 
+    
     num_bots = atoi(argv[1]);
     strcpy(socket_name, argv[2]);
     printf("Socket name: %s", socket_name);
@@ -85,6 +86,15 @@ int main(int argc, char * argv[]){
 
     printf("sending CONETC\n");
 
+    /* Set prizes */
+    for(int i = 0; i < 5; i++){
+        srand(clock());
+
+        /* Generate number between 1 and 5 and store the ASCII value */
+        msg.prizes[i].hp = (rand() % 5) + 1;
+        msg.prizes[i].ch = msg.prizes[i].hp + 30;
+    }
+
     /* Send connect message to server */
     int n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
     if (n_bytes!= sizeof(message_t)){
@@ -94,26 +104,56 @@ int main(int argc, char * argv[]){
 
     printf("SENT COONTE\n");
 
+    elapsed_time_bots = 0;
+    elapsed_time_prizes = 0;
+
     while(1){
 
-        sleep(3);
+        sleep(1);
 
-        printf("sending movement\n");
+        elapsed_time_bots++;
+        elapsed_time_prizes++;
 
-        /* Generate new bot´s movements */
-        for(int bot_id = 0; bot_id < num_bots; bot_id++){
 
+        if(elapsed_time_bots == 3){
+            printf("sending bot movement\n");
+            /* Generate new bot´s movements */
+            for(int bot_id = 0; bot_id < num_bots; bot_id++){
+
+                /* Set movement message */
+                msg.msg_type = ball_movement;
+                msg.direction = generate_direction();
+                msg.player_num = bot_id;
+
+                /* Send ball_movement to server */
+                n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
+                if (n_bytes!= sizeof(message_t)){
+                    perror("write");
+                    exit(-1);
+                }
+            }
+            elapsed_time_bots = 0;
+        }
+
+        if(elapsed_time_prizes == 5){
+            /* Generate new prize */
+            srand(clock());
+
+            /* Generate number between 1 and 5 and store the ASCII value */
+            msg.prizes[0].hp = (rand() % 5) + 1;
+            msg.prizes[0].ch = msg.prizes[0].hp + 30;
+            
             /* Set movement message */
-            msg.msg_type = ball_movement;
-            msg.direction = generate_direction();
-            msg.player_num = bot_id;
+            msg.msg_type = prize_spawn;
 
-            /* Send ball_movement to server */
+            /* Send prize_spawn to server */
             n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
             if (n_bytes!= sizeof(message_t)){
                 perror("write");
                 exit(-1);
             }
+
+            elapsed_time_prizes = 0;
         }
     }
 
