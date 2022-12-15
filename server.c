@@ -70,7 +70,7 @@ void find_empty (int * x, int * y, player_info_t players[10], player_info_t bots
     }
 }
 
-char ch_checker (char character, player_info_t players [10]) {
+char ch_checker (char character, player_info_t players[10]) {
 
     int eureka = 0, lowercase;
 
@@ -96,6 +96,28 @@ char ch_checker (char character, player_info_t players [10]) {
 
     return character;
 }
+
+
+/* show_all_health()
+ * Function prints in the message window the health of all connected players
+ */
+void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
+
+    int i;
+
+    for(i = 1; i < 7; i++){
+        mvwprintw(message_win, i, 1, "                  ");
+    }
+
+    for (i = 0; i < 10; i++){
+        if (player_data[i].ch != -1){
+            mvwprintw(message_win, i % 6, i / 6 * 11, "%c-> %d ", player_data[i].ch, player_data[i].hp);
+        }
+    }
+    wrefresh(message_win);
+
+}
+
 
 int main()
 {	
@@ -150,7 +172,7 @@ int main()
 	wrefresh(my_win);
 
     /* Create message window */
-    WINDOW * message_win = newwin(5, WINDOW_SIZE, WINDOW_SIZE, 0);
+    WINDOW * message_win = newwin(7, WINDOW_SIZE, WINDOW_SIZE, 0);
     box(message_win, 0 , 0);
     wrefresh(message_win);
 
@@ -200,7 +222,7 @@ int main()
 
                             // Draw prize
                             wmove(my_win, pos_x, pos_y);
-                            waddch(my_win, ch);
+                            waddch(my_win, prize_data[i].ch);
                             wrefresh(my_win);
                         }
 
@@ -446,6 +468,7 @@ int main()
                 clear_to_move = 1;
                 
             }
+            show_all_health(message_win, player_data);
         }
 
         /* DISCONNECT MESSAGE */
@@ -453,7 +476,7 @@ int main()
             player_data [msg.player_num].ch = -1;
 
             // Delete player from the screen
-            wmove(my_win, player_data [msg.player_num].pos_y, player_data [msg.player_num].pos_x);
+            wmove(my_win, player_data[msg.player_num].pos_y, player_data[msg.player_num].pos_x);
             waddch(my_win,' ');
             wrefresh(my_win);
 

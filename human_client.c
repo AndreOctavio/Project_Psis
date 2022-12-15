@@ -188,9 +188,14 @@ int main(int argc, char *argv[]){
                     if(msg.player[i].ch != -1){
                         /* Draw all the players */
                         draw_player(my_win, &msg.player[i], 1);
-                    } else if (msg.bots[i].ch != -1){
+                    }
+                    if (msg.bots[i].ch != -1){
                         /* Draw all the bots */
                         draw_player(my_win, &msg.bots[i], 1);
+                    }
+                    if (msg.prizes[i].ch != -1){
+                        /* Draw all the bots */
+                        draw_player(my_win, &msg.prizes[i], 1);
                     }
                     msg.bots[i].ch = -2;
                 }

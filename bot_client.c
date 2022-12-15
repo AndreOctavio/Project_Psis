@@ -92,7 +92,7 @@ int main(int argc, char * argv[]){
 
         /* Generate number between 1 and 5 and store the ASCII value */
         msg.prizes[i].hp = (rand() % 5) + 1;
-        msg.prizes[i].ch = msg.prizes[i].hp + 30;
+        msg.prizes[i].ch = msg.prizes[i].hp + 48;
     }
 
     /* Send connect message to server */
@@ -136,12 +136,13 @@ int main(int argc, char * argv[]){
         }
 
         if(elapsed_time_prizes == 5){
+            printf("sending prize_spawn\n");
             /* Generate new prize */
             srand(clock());
 
             /* Generate number between 1 and 5 and store the ASCII value */
             msg.prizes[0].hp = (rand() % 5) + 1;
-            msg.prizes[0].ch = msg.prizes[0].hp + 30;
+            msg.prizes[0].ch = msg.prizes[0].hp + 48;
             
             /* Set movement message */
             msg.msg_type = prize_spawn;
