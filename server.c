@@ -72,7 +72,7 @@ char ch_checker (char character, player_info_t players [10]) {
 
         eureka = 1;
 
-        for (int i; i < 10; i++) {
+        for (int i = 0; i < 10; i++) {
             if (character == players[i].ch) {
                 eureka = 0;
 
@@ -279,10 +279,15 @@ int main()
                                 /* HEALTH_0 MESSAGE */
                                 msg.msg_type = health_0;
                                 msg.player[j].ch = player_data [j].ch;
+                                msg.player[j].hp = player_data [j].hp;
+                                i = msg.player_num;
+                                msg.player_num = j;
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
                                 wmove(my_win, player_data [j].pos_y, player_data [j].pos_x);
                                 waddch(my_win,' ');
                                 player_data [j].ch = -1;
+                                msg.player_num = i;
+                                current_players--;
 
                             } 
 
@@ -333,7 +338,7 @@ int main()
 
                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[msg.player_num], client_addr_size);
 
-                clear_to_move = 1; 
+                clear_to_move = 1;
 
             } else if (bot_data[msg.player_num].ch == msg.bots[msg.player_num].ch){
 
@@ -360,11 +365,15 @@ int main()
                                 /* HEALTH_0 MESSAGE */
                                 msg.msg_type = health_0;
                                 msg.player[j].ch = player_data [j].ch;
+                                msg.player[j].hp = player_data [j].hp;
+                                i = msg.player_num;
+                                msg.player_num = j;
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
                                 wmove(my_win, player_data [j].pos_y, player_data [j].pos_x);
                                 waddch(my_win,' ');
                                 player_data [j].ch = -1;
-
+                                msg.player_num = i;
+                                current_players--;
                             } 
 
                             clear_to_move = 0;
@@ -416,6 +425,8 @@ int main()
             wmove(my_win, player_data [msg.player_num].pos_y, player_data [msg.player_num].pos_x);
             waddch(my_win,' ');
             wrefresh(my_win);
+
+            current_players--;
         }
 
     }

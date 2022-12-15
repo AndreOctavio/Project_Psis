@@ -98,15 +98,22 @@ int main(int argc, char *argv[]){
         exit(-1);
     }
 
-    /* Receive Ball_information message from server */
+    /* Receive Ball_information or lobby_full message from server */
     n_bytes = recvfrom(socket_fd, &msg, sizeof(message_t), 0, NULL, NULL);
     if (n_bytes!= sizeof(message_t)){
         perror("read");
         exit(-1);
     }
 
-    if(character[0] == msg.player[1].ch){
-        print("Your Character already exists, you will be %c\n", msg.player[msg.player_num].ch);
+    if (msg.msg_type == lobby_full){
+        printf("The Lobby is full, try again later\n");
+        sleep(5);
+        close(socket_fd);
+        exit(0);
+    }
+
+    if(character[0] != msg.player[msg.player_num].ch){
+        printf("Your Character already exists, you will be %c\n", msg.player[msg.player_num].ch);
         sleep(2);
     }
 
@@ -185,25 +192,13 @@ int main(int argc, char *argv[]){
                         /* Draw all the bots */
                         draw_player(my_win, &msg.bots[i], 1);
                     }
+                    msg.bots[i].ch = -2;
                 }
                 /* Print player HP in message window */
                 mvwprintw(message_win, 1, 1, "                  ");
                 mvwprintw(message_win, 1, 1, "%c %d", msg.player[msg.player_num].ch, msg.player[msg.player_num].hp);
                 wrefresh(message_win);
-            }
-            else if (msg.msg_type == lobby_full){
-                mvwprintw(message_win, 1, 1, "                  ");
-                mvwprintw(message_win, 1, 1, "The lobby is full ");
-                mvwprintw(message_win, 2, 1, "                  ");
-                mvwprintw(message_win, 2, 1, "Try Again Later   ");
-                wrefresh(message_win);
-                /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
-                sleep(5);
-                endwin();
-                close(socket_fd);
-                exit(0);
-            }
-            else if (msg.msg_type == health_0){
+            } else if (msg.msg_type == health_0){
                 /* Print player HP in message window */
                 mvwprintw(message_win, 1, 1, "                  ");
                 mvwprintw(message_win, 1, 1, "%c %d", msg.player[msg.player_num].ch, msg.player[msg.player_num].hp);
