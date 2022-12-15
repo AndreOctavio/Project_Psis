@@ -32,7 +32,7 @@ void clear_screen(WINDOW *win){
 int main(int argc, char *argv[]){
 
     int socket_fd;
-    char character;
+    char character[64];
     //char socket_name[64];
     player_info_t player;
 
@@ -43,13 +43,20 @@ int main(int argc, char *argv[]){
         printf("Incorrect Arguments, please write server address\n");
         exit(-1);
     }
-
+    int n;
     /* Player selects its character */
     printf("   ***    Welcome to the game!    ***   \n");
     printf("Select your character and press \"Enter\": \n");
-    scanf("%c", &character);
+    scanf("%s", character);
+    while(!((character[0] > 'a' && character[0] < 'z') || (character[0] > 'A' && character[0] < 'Z'))) {
+        printf("Character must be a letter, try again: \n");
+        n = scanf(" %s", character);
+    }
+
+    
+
     printf("Socket name:");
-    player.ch = character;
+    player.ch = character[0];
 
     /* Create client socket */
     local_client_addr.sun_family = AF_UNIX;
@@ -91,11 +98,23 @@ int main(int argc, char *argv[]){
         exit(-1);
     }
 
-    /* Receive Ball_information message from server */
+    /* Receive Ball_information or lobby_full message from server */
     n_bytes = recvfrom(socket_fd, &msg, sizeof(message_t), 0, NULL, NULL);
     if (n_bytes!= sizeof(message_t)){
         perror("read");
         exit(-1);
+    }
+
+    if (msg.msg_type == lobby_full){
+        printf("The Lobby is full, try again later\n");
+        sleep(5);
+        close(socket_fd);
+        exit(0);
+    }
+
+    if(character[0] != msg.player[msg.player_num].ch){
+        printf("Your Character already exists, you will be %c\n", msg.player[msg.player_num].ch);
+        sleep(2);
     }
 
     /* Set player variable */
@@ -126,7 +145,6 @@ int main(int argc, char *argv[]){
     /* Print player HP in message window */
     mvwprintw(message_win, 1, 1, "%c %d", player.ch, player.hp);
     wrefresh(message_win);
-
 
 
 
@@ -174,25 +192,13 @@ int main(int argc, char *argv[]){
                         /* Draw all the bots */
                         draw_player(my_win, &msg.bots[i], 1);
                     }
+                    msg.bots[i].ch = -2;
                 }
                 /* Print player HP in message window */
                 mvwprintw(message_win, 1, 1, "                  ");
                 mvwprintw(message_win, 1, 1, "%c %d", msg.player[msg.player_num].ch, msg.player[msg.player_num].hp);
                 wrefresh(message_win);
-            }
-            else if (msg.msg_type == lobby_full){
-                mvwprintw(message_win, 1, 1, "                  ");
-                mvwprintw(message_win, 1, 1, "The lobby is full ");
-                mvwprintw(message_win, 2, 1, "                  ");
-                mvwprintw(message_win, 2, 1, "Try Again Later   ");
-                wrefresh(message_win);
-                /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
-                sleep(5);
-                endwin();
-                close(socket_fd);
-                exit(0);
-            }
-            else if (msg.msg_type == health_0){
+            } else if (msg.msg_type == health_0){
                 /* Print player HP in message window */
                 mvwprintw(message_win, 1, 1, "                  ");
                 mvwprintw(message_win, 1, 1, "%c %d", msg.player[msg.player_num].ch, msg.player[msg.player_num].hp);
