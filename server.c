@@ -221,7 +221,7 @@ int main()
                             prize_data[i].pos_y = pos_y;
 
                             // Draw prize
-                            wmove(my_win, pos_x, pos_y);
+                            wmove(my_win, pos_y, pos_x);
                             waddch(my_win, prize_data[i].ch);
                             wrefresh(my_win);
                         }
@@ -407,6 +407,7 @@ int main()
                 for (i = 0; i < 10; i++) { //Copy the current player data
                     msg.player[i] = player_data[i];
                     msg.bots[i] = bot_data[i];
+                    msg.prizes[i] = prize_data[i];
                 }
 
                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[msg.player_num], client_addr_size);
@@ -456,10 +457,11 @@ int main()
                     }
 
                     // Look for a bot
-                    if ((bot_data[j].ch != -1) && (bot_data[j].ch != msg.bots[msg.player_num].ch)) {
+                    if (bot_data[j].ch != -1) {
 
                         // Bot hits a bot
                         if (bot_data[j].pos_x == bot_data[msg.player_num].pos_x && bot_data[j].pos_y == bot_data[msg.player_num].pos_y){
+
                             clear_to_move = 0;
                             break;
                         } 
@@ -473,7 +475,6 @@ int main()
                         if ((prize_data[j].pos_x == bot_data[msg.player_num].pos_x) && (prize_data[j].pos_y == bot_data[msg.player_num].pos_y)){
                             
                             clear_to_move = 0;
-                            
                             break;
                         } 
 
