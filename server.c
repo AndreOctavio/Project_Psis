@@ -174,7 +174,7 @@ int main()
         if ((msg.msg_type == connection) && ((current_players < 10) || (msg.bots[0].ch == '*'))) { // Maximum of 10 players
 
             /* Iterate through bots or do once if human player */
-            while (msg.player_num != 0) {
+            while (msg.player_num > 0) {
 
 
                 find_empty (&pos_x, &pos_y, player_data, bot_data, message_win);
@@ -182,9 +182,9 @@ int main()
                 /* If the client is a bot */
                 if (msg.bots[0].ch == '*') {
 
-                    bot_data[msg.player_num].ch = '*';
-                    bot_data[msg.player_num].pos_x = pos_x;
-                    bot_data[msg.player_num].pos_y = pos_y;
+                    bot_data[msg.player_num - 1].ch = '*';
+                    bot_data[msg.player_num - 1].pos_x = pos_x;
+                    bot_data[msg.player_num - 1].pos_y = pos_y;
 
                     ch = '*';
 
@@ -280,6 +280,8 @@ int main()
                                 msg.msg_type = health_0;
                                 msg.player[j].ch = player_data [j].ch;
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
+                                wmove(my_win, player_data [j].pos_y, player_data [j].pos_x);
+                                waddch(my_win,' ');
                                 player_data [j].ch = -1;
 
                             } 
@@ -294,7 +296,7 @@ int main()
                     if (bot_data[j].ch != -1) {
 
                         //Player hits a bot
-                        if (bot_data[j].pos_x == player_data[msg.player_num].pos_x && player_data[j].pos_y == player_data[msg.player_num].pos_y){
+                        if ((bot_data[j].pos_x == player_data[msg.player_num].pos_x) && (bot_data[j].pos_y == player_data[msg.player_num].pos_y)){
                             clear_to_move = 0;
                             break;
                         } 
@@ -359,6 +361,8 @@ int main()
                                 msg.msg_type = health_0;
                                 msg.player[j].ch = player_data [j].ch;
                                 sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
+                                wmove(my_win, player_data [j].pos_y, player_data [j].pos_x);
+                                waddch(my_win,' ');
                                 player_data [j].ch = -1;
 
                             } 
@@ -399,6 +403,7 @@ int main()
                     bot_data[msg.player_num].pos_x = pos_x;
                     bot_data[msg.player_num].pos_y = pos_y;
                 }
+                clear_to_move = 1;
                 
             }
         }

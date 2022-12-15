@@ -77,6 +77,7 @@ int main(int argc, char * argv[]){
     /* Set bots */
     for(int i = 0; i < num_bots; i++){
         msg.bots[i].ch = '*';
+        msg.player[i].ch = -2;
     }
 
     msg.msg_type = connection;
@@ -93,7 +94,7 @@ int main(int argc, char * argv[]){
 
     printf("SENT COONTE\n");
 
-    while(0){
+    while(1){
 
         sleep(3);
 

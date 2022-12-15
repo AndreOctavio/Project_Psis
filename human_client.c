@@ -21,6 +21,13 @@ void draw_player(WINDOW *win, player_info_t * player, int delete){
     wrefresh(win);
 }
 
+void clear_screen(WINDOW *win){
+
+    for(int i = 1; i < WINDOW_SIZE - 1; i++){
+        mvwprintw(win, i, 1, "                  ");
+    }
+    wrefresh(win);
+}
 
 int main(int argc, char *argv[]){
 
@@ -157,13 +164,15 @@ int main(int argc, char *argv[]){
             /* Checks if message recv is field_status */
             if(msg.msg_type == field_status){
 
-                wclear(my_win);
-                box(my_win, 0 , 0);
+                clear_screen(my_win);
 
                 for(int i = 0; i < 10; i++){
                     if(msg.player[i].ch != -1){
                         /* Draw all the players */
                         draw_player(my_win, &msg.player[i], 1);
+                    } else if (msg.bots[i].ch != -1){
+                        /* Draw all the bots */
+                        draw_player(my_win, &msg.bots[i], 1);
                     }
                 }
                 /* Print player HP in message window */
@@ -179,7 +188,9 @@ int main(int argc, char *argv[]){
                 wrefresh(message_win);
                 /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
                 sleep(5);
-                break;
+                endwin();
+                close(socket_fd);
+                exit(0);
             }
             else if (msg.msg_type == health_0){
                 /* Print player HP in message window */
@@ -194,11 +205,15 @@ int main(int argc, char *argv[]){
                 wrefresh(message_win);
                 /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
                 sleep(5);
-                break;
+                endwin();
+                close(socket_fd);
+                exit(0);
             }
         }
     }
 
+
+    /************  GO BACK TO THE BEGINNIG  **************/
     msg.msg_type = disconnect;
 
     /* Send ball_movement to server */
@@ -207,8 +222,6 @@ int main(int argc, char *argv[]){
         perror("write");
         exit(-1);
     }
-
-    /************  GO BACK TO THE BEGINNIG  **************/
 
     endwin();
     close(socket_fd);
