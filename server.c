@@ -32,7 +32,7 @@ void moove_player (player_info_t * player, int direction){
     }
 }
 
-void find_empty (int * x, int * y, player_info_t players[10], player_info_t bots[10], WINDOW * message_win) {
+void find_empty (int * x, int * y, player_info_t players[10], player_info_t bots[10], player_info_t prizes [10]) {
 
     int found = 0;
 
@@ -60,6 +60,12 @@ void find_empty (int * x, int * y, player_info_t players[10], player_info_t bots
                     break;
                 }
             } 
+            if (prizes[i].ch != -1) {
+                if ((prizes[i].pos_x == *x) && (prizes[i].pos_y == *y)) {
+                    found = 0;
+                    break;
+                }
+            }
         }
     }
 }
@@ -93,15 +99,17 @@ char ch_checker (char character, player_info_t players [10]) {
 
 int main()
 {	
-    player_info_t player_data [10]; // Array to store all of the info of the current players in the game (10 max)
-    player_info_t bot_data [10]; // Array to store all of the info about the bots (10 max)
+    player_info_t player_data[10]; // Array to store all of the info of the current players in the game (10 max)
+    player_info_t bot_data[10]; // Array to store all of the info about the bots (10 max)
+    player_info_t prize_data[10];
 
-    struct sockaddr_un client_addr [10]; // Array to store the players addresses
+    struct sockaddr_un client_addr[10]; // Array to store the players addresses
     socklen_t client_addr_size = sizeof(struct sockaddr_un);
 
     for (int i = 0; i < 10; i++) {
         player_data[i].ch = -1;
         bot_data[i].ch = -1;
+        prize_data[i].ch = -1;
     }
 
     int current_players = 0; // Keeps the current amount of players in the game
@@ -150,7 +158,7 @@ int main()
     int pos_x, pos_y;
     char ch;
     int n_bytes;
-    int prizes_to_spawn;
+    int spawn_prizes = 1;
 
     message_t msg;
 
@@ -176,12 +184,31 @@ int main()
             /* Iterate through bots or do once if human player */
             while (msg.player_num > 0) {
 
-
-                find_empty (&pos_x, &pos_y, player_data, bot_data, message_win);
-
                 /* If the client is a bot */
                 if (msg.bots[0].ch == '*') {
+                    
+                    if (spawn_prizes) {
 
+                        for (i = 0; i < 5; i++) {
+                            find_empty (&pos_x, &pos_y, player_data, bot_data, prize_data);
+
+                            prize_data[i].ch = msg.prizes[i].ch;
+                            prize_data[i].hp = msg.prizes[i].hp;
+
+                            prize_data[i].pos_x = pos_x;
+                            prize_data[i].pos_y = pos_y;
+
+                            // Draw prize
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, ch);
+                            wrefresh(my_win);
+                        }
+
+                        spawn_prizes = 0;
+                    }
+
+                    find_empty (&pos_x, &pos_y, player_data, bot_data, prize_data);
+                    
                     bot_data[msg.player_num - 1].ch = '*';
                     bot_data[msg.player_num - 1].pos_x = pos_x;
                     bot_data[msg.player_num - 1].pos_y = pos_y;
@@ -190,6 +217,9 @@ int main()
 
                 /* If the client is a player */
                 } else {
+
+                    find_empty (&pos_x, &pos_y, player_data, bot_data, prize_data);
+
                     for (i = 0; i < 10; i++) {
                         if (player_data[i].ch == -1) { // Get the first avaiable space in the array
 
@@ -223,6 +253,7 @@ int main()
                     for (i = 0; i < 10; i++) { // Copy the current player data
                         msg.player[i] = player_data[i];
                         msg.bots[i] = bot_data[i];
+                        msg.prizes[i] = prize_data[i];
                     }
 
                     /* BALL_INFORMATION MESSAGE */
