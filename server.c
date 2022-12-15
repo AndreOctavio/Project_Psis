@@ -147,7 +147,7 @@ int main()
         if ((msg.msg_type == connection) && ((current_players < 10) || (msg.bots[0].ch == '*'))) { // Maximum of 10 players
 
             /* Iterate through bots or do once if human player */
-            while (msg.player_num != 0) {
+            while (msg.player_num > 0) {
 
 
                 find_empty (&pos_x, &pos_y, player_data, bot_data, message_win);
@@ -155,9 +155,9 @@ int main()
                 /* If the client is a bot */
                 if (msg.bots[0].ch == '*') {
 
-                    bot_data[msg.player_num].ch = '*';
-                    bot_data[msg.player_num].pos_x = pos_x;
-                    bot_data[msg.player_num].pos_y = pos_y;
+                    bot_data[msg.player_num - 1].ch = '*';
+                    bot_data[msg.player_num - 1].pos_x = pos_x;
+                    bot_data[msg.player_num - 1].pos_y = pos_y;
 
                     ch = '*';
 
