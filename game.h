@@ -34,3 +34,5 @@ typedef struct message_t
     int player_num;
     int direction;
 } message_t;
+
+void show_all_health(WINDOW * message_win, player_info_t player_data[10]);

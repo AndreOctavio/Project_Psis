@@ -3,7 +3,6 @@
 WINDOW * message_win;
 WINDOW * my_win;
 
-
 void draw_player(WINDOW *win, player_info_t * player, int delete){
 
     int p_x = player->pos_x;
@@ -27,6 +26,27 @@ void clear_screen(WINDOW *win){
         mvwprintw(win, i, 1, "                  ");
     }
     wrefresh(win);
+}
+
+/* show_all_health()
+ * Function prints in the message window the health of all connected players
+ */
+void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
+
+    int i, j = 0;
+
+    for(i = 1; i < 6; i++){
+        mvwprintw(message_win, i, 1, "                  ");
+    }
+
+    for (i = 0; i < 10; i++){
+        if (player_data[i].ch != -1){
+            mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c-> %d ", player_data[i].ch, player_data[i].hp);
+            j++;
+        }
+    }
+    wrefresh(message_win);
+
 }
 
 int main(int argc, char *argv[]){
@@ -183,6 +203,7 @@ int main(int argc, char *argv[]){
             if(msg.msg_type == field_status){
 
                 clear_screen(my_win);
+                show_all_health(message_win, msg.player);
 
                 for(int i = 0; i < 10; i++){
                     if(msg.player[i].ch != -1){
