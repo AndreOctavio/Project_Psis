@@ -55,6 +55,12 @@ int main(int argc, char * argv[]){
         msg.prizes[i].ch = msg.prizes[i].hp + 48;
     }
 
+    /* Set bots and player to deactivated */
+    for(int i = 0; i < 10; i++){
+        msg.bots[i].ch = -1;
+        msg.player[i].ch = -1;
+    }
+
     /* Send connect message to server */
     int n_bytes = sendto(socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &server_addr, sizeof(server_addr));
     if (n_bytes!= sizeof(message_t)){

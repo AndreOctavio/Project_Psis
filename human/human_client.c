@@ -3,7 +3,7 @@
 WINDOW * message_win;
 WINDOW * my_win;
 
-void draw_player(WINDOW *win, player_info_t * player, int delete){
+void draw_player(WINDOW *win, player_info_t * player, int delete, int color){
 
     int p_x = player->pos_x;
     int p_y = player->pos_y;
@@ -16,7 +16,9 @@ void draw_player(WINDOW *win, player_info_t * player, int delete){
     }
 
     wmove(win, p_y, p_x);
+    wattron(win, COLOR_PAIR(color));
     waddch(win, ch);
+    wattroff(win, COLOR_PAIR(color));
     wrefresh(win);
 }
 
@@ -150,6 +152,18 @@ int main(int argc, char *argv[]){
     keypad(stdscr, TRUE);   // enable full keyboard mapping
     noecho();               // disable echoing of typed characters
 
+    /* check if terminal supports color */
+    if (has_colors() == FALSE) {
+        endwin();
+        printf("Your terminal does not support color\n");
+        exit(1);
+    }
+
+    start_color();
+    init_pair(1, COLOR_BLUE, COLOR_BLACK);
+    init_pair(2, COLOR_RED, COLOR_BLACK);
+    init_pair(3, COLOR_GREEN, COLOR_BLACK);
+    init_pair(4, COLOR_RED, COLOR_MAGENTA);
 
     /* creates a window and draws a border */
     WINDOW * my_win = newwin(WINDOW_SIZE, WINDOW_SIZE, 0, 0);
@@ -163,7 +177,7 @@ int main(int argc, char *argv[]){
     wrefresh(message_win);
 
     /* Draw player in main window */
-    draw_player(my_win, &player, true);
+    draw_player(my_win, &player, true, 1);
 
     /* Print player HP in message window */
     mvwprintw(message_win, 1, 1, "%c-> %d", player.ch, player.hp);
@@ -210,15 +224,15 @@ int main(int argc, char *argv[]){
                 for(int i = 0; i < 10; i++){
                     if(msg.player[i].ch != -1){
                         /* Draw all the players */
-                        draw_player(my_win, &msg.player[i], 1);
+                        draw_player(my_win, &msg.player[i], 1, 1);
                     }
                     if (msg.bots[i].ch != -1){
                         /* Draw all the bots */
-                        draw_player(my_win, &msg.bots[i], 1);
+                        draw_player(my_win, &msg.bots[i], 1, 2);
                     }
                     if (msg.prizes[i].ch != -1){
                         /* Draw all the bots */
-                        draw_player(my_win, &msg.prizes[i], 1);
+                        draw_player(my_win, &msg.prizes[i], 1, 3);
                     }
                     msg.bots[i].ch = -2;
                 }
