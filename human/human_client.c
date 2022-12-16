@@ -1,4 +1,4 @@
-#include "game.h"
+#include "../game.h"
 
 WINDOW * message_win;
 WINDOW * my_win;
@@ -63,14 +63,14 @@ int main(int argc, char *argv[]){
         printf("Incorrect Arguments, please write server address\n");
         exit(-1);
     }
-    int n;
+    
     /* Player selects its character */
     printf("   ***    Welcome to the game!    ***   \n");
     printf("Select your character and press \"Enter\": \n");
     scanf("%s", character);
     while(!((character[0] >= 'a' && character[0] <= 'z') || (character[0] >= 'A' && character[0] <= 'Z'))) {
         printf("Character must be a letter, try again: \n");
-        n = scanf(" %s", character);
+        scanf(" %s", character);
     }
 
     
@@ -155,7 +155,7 @@ int main(int argc, char *argv[]){
     keypad(my_win, true);
 
     /* Create message window */
-    WINDOW * message_win = newwin(5, WINDOW_SIZE, WINDOW_SIZE, 0);
+    WINDOW * message_win = newwin(7, WINDOW_SIZE, WINDOW_SIZE, 0);
     box(message_win, 0 , 0);
     wrefresh(message_win);
 
@@ -163,7 +163,7 @@ int main(int argc, char *argv[]){
     draw_player(my_win, &player, true);
 
     /* Print player HP in message window */
-    mvwprintw(message_win, 1, 1, "%c %d", player.ch, player.hp);
+    mvwprintw(message_win, 1, 1, "%c-> %d", player.ch, player.hp);
     wrefresh(message_win);
 
 
@@ -203,7 +203,6 @@ int main(int argc, char *argv[]){
             if(msg.msg_type == field_status){
 
                 clear_screen(my_win);
-                show_all_health(message_win, msg.player);
 
                 for(int i = 0; i < 10; i++){
                     if(msg.player[i].ch != -1){
@@ -221,19 +220,19 @@ int main(int argc, char *argv[]){
                     msg.bots[i].ch = -2;
                 }
                 /* Print player HP in message window */
-                mvwprintw(message_win, 1, 1, "                  ");
-                mvwprintw(message_win, 1, 1, "%c %d", msg.player[msg.player_num].ch, msg.player[msg.player_num].hp);
-                wrefresh(message_win);
+                show_all_health(message_win, msg.player);
+
             } else if (msg.msg_type == health_0){
                 /* Print player HP in message window */
-                mvwprintw(message_win, 1, 1, "                  ");
-                mvwprintw(message_win, 1, 1, "%c %d", msg.player[msg.player_num].ch, msg.player[msg.player_num].hp);
-                wrefresh(message_win);
+                show_all_health(message_win, msg.player);
                 sleep(1);
                 mvwprintw(message_win, 1, 1, "                  ");
-                mvwprintw(message_win, 1, 1, "    GAME OVER :(  ");
+                mvwprintw(message_win, 1, 1, "   GAME OVER :(   ");
                 mvwprintw(message_win, 2, 1, "                  ");
-                mvwprintw(message_win, 2, 1, "Just get better...");
+                mvwprintw(message_win, 2, 1, "Just be better... ");
+                mvwprintw(message_win, 3, 1, "                  ");
+                mvwprintw(message_win, 4, 1, "                  ");
+                mvwprintw(message_win, 5, 1, "                  ");
                 wrefresh(message_win);
                 /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
                 sleep(5);

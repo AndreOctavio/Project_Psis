@@ -1,4 +1,4 @@
-#include "game.h"
+#include "../game.h"
 
 
 
@@ -23,10 +23,9 @@ int generate_direction(){
 
 int main(int argc, char * argv[]){
 
-    int socket_fd, bot_id;
+    int socket_fd;
     int num_bots, elapsed_time_bots, elapsed_time_prizes;
     char socket_name[64];
-    char character = '*';
 
     struct sockaddr_un local_client_addr;
 	struct sockaddr_un server_addr;

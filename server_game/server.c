@@ -1,4 +1,4 @@
-#include "game.h"
+#include "../game.h"
 
 WINDOW * message_win;
 
@@ -136,7 +136,7 @@ int main()
     }
 
     int current_players = 0; // Keeps the current amount of players in the game
-    int i, found = 0, clear_to_move = 1, cnt = 0;
+    int i, clear_to_move = 1;
 
     // Create the socket for the server
     int sock_fd;
@@ -184,9 +184,6 @@ int main()
     int spawn_prizes = 1, n_prizes = 0;
 
     message_t msg;
-
-    clock_t time_init;
-    double time_passed;
 
     struct sockaddr_un tmp;
 
