@@ -173,8 +173,13 @@ int main()
 	wrefresh(my_win);
 
     /* Create message window */
-    WINDOW * message_win = newwin(7, WINDOW_SIZE, WINDOW_SIZE, 0);
+    WINDOW * message_win = newwin(10, WINDOW_SIZE, WINDOW_SIZE, 0);
     box(message_win, 0 , 0);
+    wrefresh(message_win);
+
+    mvwprintw(message_win, 6, 1, "------------------");
+    mvwprintw(message_win, 7, 1, "Address:          ");
+    mvwprintw(message_win, 8, 1, "\"/temp/sock_game\"");
     wrefresh(message_win);
 
     /* Information about the character */
@@ -249,7 +254,7 @@ int main()
                 for (i = 0; i < 10; i++) {
                     if (player_data[i].ch == -1) { // Get the first avaiable space in the array
 
-                        player_data[i].ch = ch_checker(msg.player[msg.player_num].ch, player_data);
+                        player_data[i].ch = ch_checker(msg.player[0].ch, player_data);
 
                         player_data[i].pos_x = pos_x;
                         player_data[i].pos_y = pos_y;

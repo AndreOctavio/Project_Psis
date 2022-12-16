@@ -3,6 +3,10 @@
 WINDOW * message_win;
 WINDOW * my_win;
 
+/* draw_player()
+ * Function draws a player, a bot or a prize in the game window
+ * whith the given color
+ */
 void draw_player(WINDOW *win, player_info_t * player, int delete, int color){
 
     int p_x = player->pos_x;
@@ -21,6 +25,10 @@ void draw_player(WINDOW *win, player_info_t * player, int delete, int color){
     wattroff(win, COLOR_PAIR(color));
 }
 
+/* clear_screen()
+ * Function clears the game window printing blank spaces
+ * in every position
+ */
 void clear_screen(WINDOW *win){
 
     for(int i = 1; i < WINDOW_SIZE - 1; i++){
@@ -41,7 +49,7 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 
     for (i = 0; i < 10; i++){
         if (player_data[i].ch != -1){
-            mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c-> %d♥", player_data[i].ch, player_data[i].hp);
+            mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c-> %d ", player_data[i].ch, player_data[i].hp);
             j++;
         }
     }
@@ -49,20 +57,25 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 
 }
 
+/* main */
 int main(int argc, char *argv[]){
 
     int socket_fd;
     char character[64];
-    //char socket_name[64];
+    char socket_name[64];
     player_info_t player;
 
     struct sockaddr_un local_client_addr;
 	struct sockaddr_un server_addr;
 
-    if(argc != 2){
+    if(argc != 2 || strcmp(argv[1], "/tmp/sock_game") != 0){
         printf("Incorrect Arguments, please write server address\n");
+        printf("This Game's Server Adress is \"/tmp/sock_game\"\n");
         exit(-1);
     }
+
+    strcpy(socket_name, argv[1]);
+    printf("Socket name: %s", socket_name);
     
     /* Player selects its character */
     printf("   ***    Welcome to the game!    ***   \n");
@@ -86,7 +99,7 @@ int main(int argc, char *argv[]){
         exit(-1);
     }
 
-    sprintf(local_client_addr.sun_path, "%s_%d", SOCKET_NAME, getpid());
+    sprintf(local_client_addr.sun_path, "%s_%d", socket_name, getpid());
     //printf("Socket name: %s", socket_name);
 
 	unlink(local_client_addr.sun_path);
@@ -99,14 +112,14 @@ int main(int argc, char *argv[]){
 
     /* Server infos */
 	server_addr.sun_family = AF_UNIX;
-	strcpy(server_addr.sun_path, SOCKET_NAME);
+	strcpy(server_addr.sun_path, socket_name);
 
 
     /* Set connect message */
     message_t msg;
     msg.msg_type = connection;
-    msg.player[1] = player;
-    msg.player_num = 1;
+    msg.player[0] = player;
+    msg.player_num = 0;
 
     for(int i = 0; i < 10; i++){
         msg.bots[i].ch = -1;
@@ -140,6 +153,8 @@ int main(int argc, char *argv[]){
         sleep(2);
     }
 
+    character[0] = msg.player[msg.player_num].ch;
+
     /* Set player variable */
     player = msg.player[msg.player_num];
 
@@ -161,7 +176,7 @@ int main(int argc, char *argv[]){
     init_pair(1, COLOR_BLUE, COLOR_BLACK);
     init_pair(2, COLOR_RED, COLOR_BLACK);
     init_pair(3, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(4, COLOR_RED, COLOR_MAGENTA);
+    init_pair(4, COLOR_MAGENTA, COLOR_BLACK);
 
     /* creates a window and draws a border */
     WINDOW * my_win = newwin(WINDOW_SIZE, WINDOW_SIZE, 0, 0);
@@ -221,8 +236,14 @@ int main(int argc, char *argv[]){
 
                 for(int i = 0; i < 10; i++){
                     if(msg.player[i].ch != -1){
-                        /* Draw all the players */
-                        draw_player(my_win, &msg.player[i], 1, 1);
+
+                        /* If drawing this client's character, change color */
+                        if(msg.player[i].ch == character[0]){
+                            draw_player(my_win, &msg.player[i], 1, 4);
+                        } else {
+                            /* Draw all the players */
+                            draw_player(my_win, &msg.player[i], 1, 1);
+                        }
                     }
                     if (msg.bots[i].ch != -1){
                         /* Draw all the bots */
@@ -240,8 +261,6 @@ int main(int argc, char *argv[]){
 
             } else if (msg.msg_type == health_0){
                 /* Print player HP in message window */
-                show_all_health(message_win, msg.player);
-                sleep(1);
                 mvwprintw(message_win, 1, 1, "                  ");
                 mvwprintw(message_win, 1, 1, "   GAME OVER :(   ");
                 mvwprintw(message_win, 2, 1, "                  ");
