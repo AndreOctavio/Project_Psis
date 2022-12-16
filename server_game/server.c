@@ -207,9 +207,9 @@ int main()
                     
                     find_empty (&pos_x, &pos_y, player_data, bot_data, prize_data);
                 
-                    bot_data[msg.player_num - 1].ch = '*';
-                    bot_data[msg.player_num - 1].pos_x = pos_x;
-                    bot_data[msg.player_num - 1].pos_y = pos_y;
+                    bot_data[i].ch = '*';
+                    bot_data[i].pos_x = pos_x;
+                    bot_data[i].pos_y = pos_y;
 
                     // Draw bot
                     wmove(my_win, pos_y, pos_x);

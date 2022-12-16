@@ -19,7 +19,6 @@ void draw_player(WINDOW *win, player_info_t * player, int delete, int color){
     wattron(win, COLOR_PAIR(color));
     waddch(win, ch);
     wattroff(win, COLOR_PAIR(color));
-    wrefresh(win);
 }
 
 void clear_screen(WINDOW *win){
@@ -27,7 +26,6 @@ void clear_screen(WINDOW *win){
     for(int i = 1; i < WINDOW_SIZE - 1; i++){
         mvwprintw(win, i, 1, "                  ");
     }
-    wrefresh(win);
 }
 
 /* show_all_health()
@@ -43,7 +41,7 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 
     for (i = 0; i < 10; i++){
         if (player_data[i].ch != -1){
-            mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c-> %d ", player_data[i].ch, player_data[i].hp);
+            mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c-> %d♥", player_data[i].ch, player_data[i].hp);
             j++;
         }
     }
@@ -162,7 +160,7 @@ int main(int argc, char *argv[]){
     start_color();
     init_pair(1, COLOR_BLUE, COLOR_BLACK);
     init_pair(2, COLOR_RED, COLOR_BLACK);
-    init_pair(3, COLOR_GREEN, COLOR_BLACK);
+    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
     init_pair(4, COLOR_RED, COLOR_MAGENTA);
 
     /* creates a window and draws a border */
@@ -236,6 +234,7 @@ int main(int argc, char *argv[]){
                     }
                     msg.bots[i].ch = -2;
                 }
+                wrefresh(my_win);
                 /* Print player HP in message window */
                 show_all_health(message_win, msg.player);
 
