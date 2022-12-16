@@ -206,7 +206,17 @@ int main()
 
                 /* If the client is a bot */
                 if (msg.bots[0].ch == '*') {
+
+                    find_empty (&pos_x, &pos_y, player_data, bot_data, prize_data);
                     
+                    bot_data[msg.player_num - 1].ch = '*';
+                    bot_data[msg.player_num - 1].pos_x = pos_x;
+                    bot_data[msg.player_num - 1].pos_y = pos_y;
+
+                    ch = '*';
+
+                } else if (msg.prizes[0].ch != -1){
+
                     if (spawn_prizes) {
 
                         for (i = 0; i < 5; i++) {
@@ -228,14 +238,6 @@ int main()
 
                         spawn_prizes = 0;
                     }
-
-                    find_empty (&pos_x, &pos_y, player_data, bot_data, prize_data);
-                    
-                    bot_data[msg.player_num - 1].ch = '*';
-                    bot_data[msg.player_num - 1].pos_x = pos_x;
-                    bot_data[msg.player_num - 1].pos_y = pos_y;
-
-                    ch = '*';
 
                 /* If the client is a player */
                 } else {
