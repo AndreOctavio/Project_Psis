@@ -98,8 +98,6 @@ int main(int argc, char *argv[]){
 	}
 
     /* Server infos */
-    //printf("Socket name: %s", socket_name);
-    //strcpy(socket_name, argv[2]);
 	server_addr.sun_family = AF_UNIX;
 	strcpy(server_addr.sun_path, SOCKET_NAME);
 
@@ -109,6 +107,11 @@ int main(int argc, char *argv[]){
     msg.msg_type = connection;
     msg.player[1] = player;
     msg.player_num = 1;
+
+    for(int i = 0; i < 10; i++){
+        msg.bots[i].ch = -1;
+        msg.prizes[i].ch = -1;
+    }
 
 
     /* Send connect message to server */
