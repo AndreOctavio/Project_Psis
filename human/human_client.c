@@ -75,7 +75,6 @@ int main(int argc, char *argv[]){
     }
 
     strcpy(socket_name, argv[1]);
-    printf("Socket name: %s", socket_name);
     
     /* Player selects its character */
     printf("   ***    Welcome to the game!    ***   \n");

@@ -211,15 +211,6 @@ int main()
     mvwprintw(message_win, 8, 1, "\"/temp/sock_game\"");
     wrefresh(message_win);
 
-    /* Information about the character */
-    int pos_x, pos_y;
-    int n_bytes;
-    int spawn_prizes = 1, spawn_bots = 1, n_prizes = 0;
-
-    message_t msg;
-
-    struct sockaddr_un tmp;
-
     while (1)
     {
 
@@ -349,7 +340,7 @@ int main()
         if(msg.msg_type == ball_movement){
 
             /* Check if the client sending the message is in fact a player in the game and is sending from the correct addr (anti-cheat) */
-            if ((player_data[msg.player_num].ch == msg.player[msg.player_num].ch) && (client_addr[msg.player_num] == tmp)) {
+            if ((player_data[msg.player_num].ch == msg.player[msg.player_num].ch) && (strcmp(client_addr[msg.player_num].sun_path, tmp.sun_path) == 0)) {
                 
                 /* Save the old position */
                 pos_x = player_data[msg.player_num].pos_x;
