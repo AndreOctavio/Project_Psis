@@ -1,8 +1,5 @@
 #include "../game.h"
 
-WINDOW * message_win;
-WINDOW * my_win;
-
 /* draw_player()
  * Function draws a player, a bot or a prize in the game window
  * whith the given color
@@ -85,9 +82,6 @@ int main(int argc, char *argv[]){
         scanf(" %s", character);
     }
 
-    
-
-    printf("Socket name:");
     player.ch = character[0];
 
     /* Create client socket */
@@ -99,7 +93,6 @@ int main(int argc, char *argv[]){
     }
 
     sprintf(local_client_addr.sun_path, "%s_%d", socket_name, getpid());
-    //printf("Socket name: %s", socket_name);
 
 	unlink(local_client_addr.sun_path);
 
@@ -120,6 +113,7 @@ int main(int argc, char *argv[]){
     msg.player[0] = player;
     msg.player_num = 0;
 
+    /* Set correct values to initialize bots and prizes section */
     for(int i = 0; i < 10; i++){
         msg.bots[i].ch = -1;
         msg.prizes[i].ch = -1;

@@ -1,6 +1,5 @@
 #include "../game.h"
 
-WINDOW * message_win;
 
 /* moove_player() : 
 * Function that updates the coordenates of 
@@ -334,12 +333,13 @@ int main()
             /* Update the message window */
             show_all_health(message_win, player_data);
 
-        } 
+        }
 
         /* BALL_MOVEMENT MESSAGE */
         if(msg.msg_type == ball_movement){
 
-            /* Check if the client sending the message is in fact a player in the game and is sending from the correct addr (anti-cheat) */
+            /* Check if the client sending the message is in fa
+            ct a player in the game and is sending from the correct addr (anti-cheat) */
             if ((player_data[msg.player_num].ch == msg.player[msg.player_num].ch) && (strcmp(client_addr[msg.player_num].sun_path, tmp.sun_path) == 0)) {
                 
                 /* Save the old position */

@@ -8,7 +8,12 @@ int main(int argc, char * argv[]){
     struct sockaddr_un local_client_addr;
 	struct sockaddr_un server_addr;
 
-    
+    if(argc != 2 || strcmp(argv[1], "/tmp/sock_game") != 0){
+        printf("Incorrect Arguments\n");
+        printf("This Game's Server Adress is \"/tmp/sock_game\"\n");
+        exit(-1);
+    }
+
     strcpy(socket_name, argv[1]);
     printf("Socket name: %s", socket_name);
 
