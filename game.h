@@ -18,7 +18,7 @@
 
 #define WINDOW_SIZE 20
 #define SOCK_PORT 5000
-#define N_THREADS 10
+#define N_THREADS 12
 
 typedef enum msg_type_t {connection, ball_information, ball_movement, field_status, health_0, disconnect, lobby_full, prize_spawn} msg_type_t;
 typedef enum direction_t {UP, DOWN, LEFT, RIGHT} direction_t;
@@ -53,5 +53,26 @@ typedef struct thread_args_t
     player_info_t * player;
 
 } thread_args_t;
+
+typedef struct server_args_t
+{
+    WINDOW * my_win;
+    WINDOW * message_win;
+
+    int con_socket [10]; // Array to store the players addresses
+
+    /* player_data - stores all the info regarding the current players;
+    *  bot_data - stores all the info regarding the bots in the game; 
+    *  prize_data - stores all the info regarding the prizes in the game; */
+    player_info_t player_data[10]; 
+    player_info_t bot_data[10]; 
+    player_info_t prize_data[10];
+
+    int n_bots;
+    int n_players;
+    int n_prizes;
+
+    pthread_mutex_t lock;
+} server_args_t;
 
 void show_all_health(WINDOW * message_win, player_info_t player_data[10]);
