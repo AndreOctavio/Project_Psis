@@ -9,9 +9,16 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <time.h>
+#include <pthread.h>
+
+#include<netinet/in.h>
+#include<arpa/inet.h>
+
+#include<ctype.h>
 
 #define WINDOW_SIZE 20
-#define SOCKET_NAME "/tmp/sock_game"
+#define SOCK_PORT 5000
+#define N_THREADS 10
 
 typedef enum msg_type_t {connection, ball_information, ball_movement, field_status, health_0, disconnect, lobby_full, prize_spawn} msg_type_t;
 typedef enum direction_t {UP, DOWN, LEFT, RIGHT} direction_t;
@@ -34,5 +41,17 @@ typedef struct message_t
     int player_num;
     int direction;
 } message_t;
+
+typedef struct thread_args_t
+{
+    WINDOW * my_win;
+    WINDOW * message_win;
+    struct sockaddr_in server_addr;
+    int socket_fd;
+    char character;
+    message_t msg;
+    player_info_t * player;
+
+} thread_args_t;
 
 void show_all_health(WINDOW * message_win, player_info_t player_data[10]);

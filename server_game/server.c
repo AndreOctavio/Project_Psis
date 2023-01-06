@@ -141,8 +141,11 @@ int main()
     player_info_t bot_data[10]; 
     player_info_t prize_data[10]; 
 
-    struct sockaddr_un client_addr[10]; // Array to store the players addresses
-    socklen_t client_addr_size = sizeof(struct sockaddr_un);
+    struct sockaddr_in client_addr[10]; // Array to store the players addresses
+    socklen_t client_addr_size = sizeof(struct sockaddr_in);
+
+    char remote_addr_str_saved [100];
+    char remote_addr_str_tmp [100];
 
     /* Initialize the data arrays with -1 in ch */
     for (int i = 0; i < 10; i++) {
@@ -160,15 +163,14 @@ int main()
 
     message_t msg;
 
-    struct sockaddr_un tmp;
+    struct sockaddr_in tmp;
 
     /* Information about the character */
     int pos_x, pos_y;
     int n_bytes;
 
     /* Create the socket for the server */
-    int sock_fd;
-    sock_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
 
     /* Check for it was sucessfully created */ 
     if (sock_fd == -1){ 
@@ -176,12 +178,12 @@ int main()
 	    exit(-1);
     }
 
-    struct sockaddr_un local_addr;
-    local_addr.sun_family = AF_UNIX;
-    strcpy(local_addr.sun_path, SOCKET_NAME);
-    unlink(SOCKET_NAME);
+    struct sockaddr_in local_addr;
+    local_addr.sin_family = AF_INET;
+    local_addr.sin_port = htons(SOCK_PORT);
+	local_addr.sin_addr.s_addr = INADDR_ANY;
 
-    int err = bind(sock_fd, (const struct sockaddr *)&local_addr, sizeof(local_addr)); //bind the address
+    int err = bind(sock_fd, (struct sockaddr *)&local_addr, sizeof(local_addr)); //bind the address
 
     /* Check for it was sucessfully binded */
     if(err == -1) { 
@@ -337,11 +339,18 @@ int main()
 
         /* BALL_MOVEMENT MESSAGE */
         if(msg.msg_type == ball_movement){
+            
+            if (inet_ntop(AF_INET, &client_addr[msg.player_num].sin_addr, remote_addr_str_saved, 100) == NULL){
+			    perror("converting saved addr: ");
+		    }
 
-            /* Check if the client sending the message is in fa
-            ct a player in the game and is sending from the correct addr (anti-cheat) */
-            if ((player_data[msg.player_num].ch == msg.player[msg.player_num].ch) && (strcmp(client_addr[msg.player_num].sun_path, tmp.sun_path) == 0)) {
-                
+            if (inet_ntop(AF_INET, &tmp.sin_addr, remote_addr_str_tmp, 100) == NULL){
+			    perror("converting tmp addr: ");
+		    }
+
+            /* Check if the client sending the message is in fact
+            a player in the game and is sending from the correct addr (anti-cheat) */
+            if ((player_data[msg.player_num].ch == msg.player[msg.player_num].ch) && (strcmp(remote_addr_str_saved, remote_addr_str_tmp) == 0)) {  
                 /* Save the old position */
                 pos_x = player_data[msg.player_num].pos_x;
                 pos_y = player_data[msg.player_num].pos_y;
