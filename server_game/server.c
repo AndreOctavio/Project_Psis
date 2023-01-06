@@ -1,33 +1,51 @@
 #include "../game.h"
 
+int generate_direction(){
+    int direction = rand() % 4;
+    switch (direction){
+        case 0:
+            direction = KEY_UP;
+            break;
+        case 1:
+            direction = KEY_DOWN;
+            break;
+        case 2:
+            direction = KEY_LEFT;
+            break;
+        case 3:
+            direction = KEY_RIGHT;
+            break;
+    }
+    return direction;
+}
 
 /* moove_player() : 
 * Function that updates the coordenates of 
 * a player with a given direction; 
 */
-void moove_player (player_info_t * player, int direction){
+void moove_player (int *pos_x, int *pos_y, int direction){
 
     if (direction == KEY_UP){
-        if (player->pos_y  != 1){
-            player->pos_y --;
+        if (pos_y  != 1){
+            pos_y --;
         }
     }
 
     if (direction == KEY_DOWN){
-        if (player->pos_y  != WINDOW_SIZE-2){
-            player->pos_y ++;
+        if (pos_y  != WINDOW_SIZE-2){
+            pos_y ++;
         }
     }
 
     if (direction == KEY_LEFT){
-        if (player->pos_x  != 1){
-            player->pos_x --;
+        if (pos_x  != 1){
+            pos_x --;
         }
     }
 
     if (direction == KEY_RIGHT)
-        if (player->pos_x  != WINDOW_SIZE-2){
-            player->pos_x ++;
+        if (pos_x  != WINDOW_SIZE-2){
+            pos_x ++;
     }
 }
 
@@ -130,29 +148,143 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
     wrefresh(message_win);
 }
 
+void * bot_loop(void * arg){
 
-int main()
+    server_args_t * bot = (server_args_t *) arg;
+
+    int pos_x, pos_y, i, clear_to_move = 1;
+
+    message_t msg;
+
+    /* Spawn the number of bots given in player_num */
+    for (i = 0; i < bot->n_bots; i++) {
+        
+        pthread_mutex_lock(&bot->lock);
+
+        find_empty (&pos_x, &pos_y, bot->player_data, bot->bot_data, bot->prize_data); // Find an empty space to spawn the bot
+
+        /* Save the bot data */
+        bot->bot_data[i].ch = '*';
+        bot->bot_data[i].pos_x = pos_x;
+        bot->bot_data[i].pos_y = pos_y;
+
+        /* Draw bot */
+        wmove(bot->my_win, pos_y, pos_x);
+        waddch(bot->my_win, '*');
+        wrefresh(bot->my_win);
+
+        pthread_mutex_unlock(&bot->lock);
+
+    }
+
+    while(1) {
+
+        sleep(3);
+
+        pthread_mutex_lock(&bot->lock);
+
+        for (i = 0; i < bot->n_bots; i++) {
+
+            /* Save the old position */
+            pos_x = bot->bot_data[i].pos_x;
+            pos_y = bot->bot_data[i].pos_y;
+
+            /* Calculate the new position */
+            moove_player(&pos_x, &pos_y, generate_direction());
+
+            /* Check if the bot hit something */
+            for(int j = 0 ; j < 10; j++){
+
+                /* Check if the position in the array has a player */
+                if((bot->player_data[j].ch != -1) && (j != i)) {
+                    
+                    /* See if the player is in the position that the bot is moving into */
+                    if (bot->player_data[j].pos_x == pos_x && bot->player_data[j].pos_y == pos_y){ //Bot hits another player
+
+                        bot->player_data[j].hp--; // Decrease HP of the player that was hit
+
+                        if (bot->player_data[j].hp == 0) { // If the player that was hit has 0 lives then its GAME OVER
+
+                            /* HEALTH_0 MESSAGE */
+                            msg.msg_type = health_0;
+
+                            if (send(bot->con_socket[j], &msg, sizeof(msg), 0) < 0) {
+                                printf("Can't send\n");
+                                return -1;
+                            }
+                            
+                            wmove(bot->my_win, bot->player_data[j].pos_y, bot->player_data[j].pos_x);
+                            waddch(bot->my_win,' ');
+
+                            /* Take the player out of the game*/
+                            bot->player_data[j].ch = -1;
+                            bot->n_players--;
+                        } 
+
+                        clear_to_move = 0; // Can't move into new position
+
+                        break;
+                    }
+                }
+
+                /* Check if bot hit another bot */
+                if ((bot->bot_data[j].ch != -1) && (j != i)) {
+
+                    /* Bot hits a bot */
+                    if (bot->bot_data[j].pos_x == pos_x && bot->bot_data[j].pos_y == pos_y){
+
+                        clear_to_move = 0; // Can't move into new position
+                        break;
+                    } 
+
+                }
+                
+                /* Check if bot hit a prize */
+                if (bot->prize_data[j].ch != -1){
+
+                    /* Bot hits a prize */
+                    if ((bot->prize_data[j].pos_x == pos_x) && (bot->prize_data[j].pos_y == pos_y)){
+                        
+                        clear_to_move = 0; // Can't move into new position
+                        break;
+                    } 
+
+                }
+            }
+
+            if (clear_to_move) { // Go into new position
+
+                /* Delete bot from old position */
+                wmove(bot->my_win, bot->bot_data[i].pos_y, bot->bot_data[i].pos_x);
+                waddch(bot->my_win,' ');
+
+                /* Update the bot_data */
+                bot->bot_data[i].pos_x = pos_x;
+                bot->bot_data[i].pos_y = pos_y;
+
+                /* Draw bot in the new position */
+                wmove(bot->my_win, pos_y, pos_x);
+                waddch(bot->my_win, '*');
+                wrefresh(bot->my_win);	
+
+            }
+
+            clear_to_move = 1;
+        }
+
+        /* Update the message window */
+        show_all_health(bot->message_win, bot->player_data);
+
+        pthread_mutex_unlock(&bot->lock);
+    }
+}
+
+
+int main(int argc, char *argv[])
 {	
-
-    /* player_data - stores all the info regarding the current players;
-    *  bot_data - stores all the info regarding the bots in the game; 
-    *  prize_data - stores all the info regarding the prizes in the game; */
-    player_info_t player_data[10]; 
-    player_info_t bot_data[10]; 
-    player_info_t prize_data[10]; 
-
-    struct sockaddr_in client_addr[10]; // Array to store the players addresses
-    socklen_t client_addr_size = sizeof(struct sockaddr_in);
 
     char remote_addr_str_saved [100];
     char remote_addr_str_tmp [100];
-
-    /* Initialize the data arrays with -1 in ch */
-    for (int i = 0; i < 10; i++) {
-        player_data[i].ch = -1;
-        bot_data[i].ch = -1;
-        prize_data[i].ch = -1;
-    }
 
     int current_players = 0; // Keeps the current amount of players in the game
     int n_prizes = 0; // Keeps the number the current amount of prizes in the game
@@ -170,7 +302,7 @@ int main()
     int n_bytes;
 
     /* Create the socket for the server */
-    int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     /* Check for it was sucessfully created */ 
     if (sock_fd == -1){ 
@@ -181,7 +313,11 @@ int main()
     struct sockaddr_in local_addr;
     local_addr.sin_family = AF_INET;
     local_addr.sin_port = htons(SOCK_PORT);
-	local_addr.sin_addr.s_addr = INADDR_ANY;
+	local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_size = sizeof(struct sockaddr_in);
+    int new_con;
 
     int err = bind(sock_fd, (struct sockaddr *)&local_addr, sizeof(local_addr)); //bind the address
 
@@ -191,32 +327,69 @@ int main()
 	    exit(-1);
     }
 
+    if ((listen(sock_fd, 5)) != 0) {
+        printf("Listen failed...\n");
+        exit(0);
+    } else {
+        printf("Server listening..\n");
+    }
+
     /* ncurses initialization */
 	initscr();		    	
 	cbreak();				
     keypad(stdscr, TRUE);   
 	noecho();			    
 
+    server_args_t serv_arg;
+    
     /* Creates a window and draws a border */
-    WINDOW * my_win = newwin(WINDOW_SIZE, WINDOW_SIZE, 0, 0);
-    box(my_win, 0 , 0);	
-	wrefresh(my_win);
+    serv_arg.my_win = newwin(WINDOW_SIZE, WINDOW_SIZE, 0, 0);
+    box(serv_arg.my_win, 0 , 0);	
+	wrefresh(serv_arg.my_win);
 
     /* Create message window */
-    WINDOW * message_win = newwin(10, WINDOW_SIZE, WINDOW_SIZE, 0);
-    box(message_win, 0 , 0);
-    wrefresh(message_win);
+    serv_arg.message_win = newwin(10, WINDOW_SIZE, WINDOW_SIZE, 0);
+    box(serv_arg.message_win, 0 , 0);
+    wrefresh(serv_arg.message_win);
 
-    mvwprintw(message_win, 6, 1, "------------------");
-    mvwprintw(message_win, 7, 1, "Address:          ");
-    mvwprintw(message_win, 8, 1, "\"/temp/sock_game\"");
-    wrefresh(message_win);
+    mvwprintw(serv_arg.message_win, 6, 1, "------------------");
+    mvwprintw(serv_arg.message_win, 7, 1, "Address:          ");
+    mvwprintw(serv_arg.message_win, 8, 1, "\"/temp/sock_game\"");
+    wrefresh(serv_arg.message_win);
+
+    /* Initialize the data arrays with -1 in ch */
+    for (int i = 0; i < 10; i++) {
+        serv_arg.player_data[i].ch = -1;
+        serv_arg.bot_data[i].ch = -1;
+        serv_arg.prize_data[i].ch = -1;
+    }
+
+    serv_arg.n_prizes = 0;
+    serv_arg.n_bots = argv[1];
+    serv_arg.n_players = 0; //talvez nao seja preciso
+
+    int s = 0; //index of where the tcp connection is keeped in con_socket array
+
+
+    if (pthread_mutex_init(&serv_arg.lock, NULL) != 0)
+    {
+        printf("\n mutex init failed\n");
+        return 1;
+    }
+
+    pthread_t thread_id[N_THREADS];
+    pthread_create(&thread_id[10], NULL, &bot_loop, (void *) &serv_arg);
 
     while (1)
     {
+        new_con = accept(sock_fd, (struct sockaddr*)&client_addr, &client_addr_size);
+        
+        serv_arg.con_socket[s] = new_con;
+        s++;
 
         /* Receive message from the clients */
-        n_bytes = recvfrom(sock_fd, &msg, sizeof(message_t), 0, (struct sockaddr *)&tmp, &client_addr_size);
+        n_bytes = recv(serv_arg.con_socket[0], &msg, sizeof(message_t), 0);
+        
         if (n_bytes!= sizeof(message_t)){
             continue;
         }
