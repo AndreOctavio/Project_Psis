@@ -218,6 +218,8 @@ void * bot_loop(void * arg){
         waddch(bot->my_win, '*');
         wrefresh(bot->my_win);
 
+        send_all_field_status(bot);
+
         pthread_mutex_unlock(&bot->lock);
 
     }
@@ -323,6 +325,8 @@ void * bot_loop(void * arg){
         /* Update the message window */
         show_all_health(bot->message_win, bot->player_data);
 
+        send_all_field_status(bot);
+
         pthread_mutex_unlock(&bot->lock);
     }
 }
@@ -354,9 +358,12 @@ void * prize_loop(void * arg){
             waddch(prize->my_win, prize->prize_data[i].ch);
             wrefresh(prize->my_win);
     
+            send_all_field_status(prize);
+
             pthread_mutex_unlock(&prize->lock);
     
         }
+
     
         while(1) {
     
@@ -389,6 +396,9 @@ void * prize_loop(void * arg){
                     break;
                 }
             }
+
+            send_all_field_status(prize);
+
             pthread_mutex_unlock(&prize->lock);
     
         }
@@ -454,6 +464,8 @@ void * player_loop(void * arg){
 
             /* BALL_INFORMATION MESSAGE */
             send(player->con_socket[self], &msg, sizeof(msg), 0);
+
+            send_all_field_status(player);
 
             pthread_mutex_unlock(&player->lock);
         }
@@ -586,14 +598,16 @@ void * player_loop(void * arg){
             /* Update the message window */
             show_all_health(player->message_win, player->player_data);
 
-            pthread_mutex_unlock(&player->lock);
-        }
+            send_all_field_status(player);
 
-        else if (msg.msg_type = reconnect) {
+            pthread_mutex_unlock(&player->lock);
+        } else if (msg.msg_type == reconnect) {
 
             pthread_mutex_lock(&player->lock);
 
             player->player_data[self].hp = 10;
+
+            send_all_field_status(player);
 
             pthread_mutex_unlock(&player->lock);
 
