@@ -347,7 +347,7 @@ void * player_loop(void * arg){
     server_args_t * player = (server_args_t *) arg;
 
     int self = player->tmp_self;
-    int pos_x, pos_y, n_bytes;
+    int pos_x, pos_y, n_bytes, clear_to_move = 1;
 
     message_t msg;
 
@@ -358,10 +358,20 @@ void * player_loop(void * arg){
 
         if (n_bytes!= sizeof(message_t)){
             continue;
+        } else if (n_bytes == 0) {
+
+            player->player_data[self].ch = -1;
+            player->n_players--;
+            close(player->con_socket[self]);
+
+            return 0;
         }
 
         /* CONNECT MESSAGE */
         if (msg.msg_type == connection) {
+
+            pthread_mutex_lock(&player->lock);
+
             find_empty (&pos_x, &pos_y, player->player_data, player->bot_data, player->prize_data); // Find an empty space to spawn the prize
 
             /* Check if the ch choosen by the player is being used, if it is we assign a random ch to the player*/
@@ -390,35 +400,138 @@ void * player_loop(void * arg){
 
             /* BALL_INFORMATION MESSAGE */
             send(player->con_socket[self], &msg, sizeof(msg), 0);
+
+            pthread_mutex_unlock(&player->lock);
+        }
+
+        if(msg.msg_type == ball_movement){
+
+            /* Check if the client sending the message is in fact
+            a player in the game (anti-cheat) */
+            if (player->player_data[msg.player_num].ch == msg.player[msg.player_num].ch) { 
+
+                pthread_mutex_lock(&player->lock); 
+
+                /* Calculate the new position */
+                moove_player(&pos_x,&pos_y, msg.direction);
+
+                /* Check if the player hit another player */
+                for(int j = 0 ; j < 10; j++){
+
+                    /* Check if the position in the array has a player (different then the player moving) */
+                    if((player->player_data[j].ch != -1) && (j != self)) {
+                        
+                        /* See if the player is in the position that our current player is moving into */
+                        if (player->player_data[j].pos_x == pos_x && player->player_data[j].pos_y == pos_y){ //Player hits another player
+
+                            /* If the player has less(or equal to) than 9 lives increment HP */
+                            if (player->player_data [self].hp <= 9) {
+                                player->player_data [self].hp++;
+                            }
+
+                            player->player_data [j].hp--; // Decrease HP of the player that was hit
+
+                            if (player->player_data [j].hp == 0) { // If the player that was hit has 0 lives then its GAME OVER
+
+                                /* HEALTH_0 MESSAGE */
+                                msg.msg_type = health_0;
+
+                                send(player->con_socket[j], &msg, sizeof(msg), 0);
+
+                                /* Take the player out of the game */
+                                wmove(player->my_win, player->player_data[j].pos_y, player->player_data[j].pos_x);
+                                waddch(player->my_win,' ');
+
+                            } 
+
+                            clear_to_move = 0; // Can't move into new position
+
+                            break;
+                        }
+                    }
+
+                    /* Check if the player hit a bot */
+                    if (player->bot_data[j].ch != -1) {
+
+                        /* Player hits a bot */
+                        if ((player->bot_data[j].pos_x == pos_x) && (player->bot_data[j].pos_y == pos_y)){
+
+                            clear_to_move = 0; // Can't move into new position
+                            break;
+                        } 
+
+                    }
+                    
+                    /* Check if the player hit a prize */
+                    if (player->prize_data[j].ch != -1){
+
+                        /* Player hits a prize */
+                        if ((player->prize_data[j].pos_x == pos_x) && (player->prize_data[j].pos_y == pos_y)){
+
+                            /* Increase player hp by the value of the prize */
+                            player->player_data[self].hp += player->prize_data[j].hp;
+
+                            /* The hp of the player must not reach values bigger than 10 */
+                            if (player->player_data[self].hp > 10) {
+
+                                player->player_data[self].hp = 10;
+
+                            }
+                            
+                            /* Take the prize out of the game */
+                            player->prize_data[j].ch = -1;
+                            player->n_prizes--;
+
+                            break;
+                        } 
+
+                    }
+                }
+
+                if (clear_to_move) { // Go into new position
+
+                    /* Delete player from old position */
+                    wmove(player->my_win, player->player_data[self].pos_y, player->player_data[self].pos_x);
+                    waddch(player->my_win,' ');
+
+                    player->player_data[self].pos_x = pos_x;
+                    player->player_data[self].pos_y = pos_y;
+
+                    /* Draw player in the new position */
+                    wmove(player->my_win, pos_y, pos_x);
+                    waddch(player->my_win, player->player_data[self].ch);
+                    wrefresh(player->my_win);	
+
+                }
+                
+                /* FIELD_STATUS MESSAGE */
+                msg.msg_type = field_status;
+
+                for (int i = 0; i < 10; i++) { //Copy the current data
+                    msg.player[i] = player->player_data[i];
+                    msg.bots[i] = player->bot_data[i];
+                    msg.prizes[i] = player->prize_data[i];
+                }
+
+                send(player->con_socket[self], &msg, sizeof(msg), 0);
+
+                clear_to_move = 1;
+
+            } 
+
+            /* Update the message window */
+            show_all_health(player->message_win, player->player_data);
+
+            pthread_mutex_unlock(&player->lock);
         }
     }
-        
-
-
 
 }
 
 
 int main(int argc, char *argv[])
 {	
-
-    char remote_addr_str_saved [100];
-    char remote_addr_str_tmp [100];
-
-    int current_players = 0; // Keeps the current amount of players in the game
-    int n_prizes = 0; // Keeps the number the current amount of prizes in the game
-    int clear_to_move = 1; // Flag to check if the player/bot can move
-    int spawn_prizes = 1, spawn_bots = 1; // Flags, only spawn the initial bots and prizes ONCE
-
     int i;
-
-    message_t msg;
-
-    struct sockaddr_in tmp;
-
-    /* Information about the character */
-    int pos_x, pos_y;
-    int n_bytes;
 
     /* Create the socket for the server */
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -519,240 +632,6 @@ int main(int argc, char *argv[])
 
             pthread_mutex_unlock(&serv_arg.lock);
         }
-        
-        
-
-
-
-
-
-
-
-        
-        /*------PROCESS THE VARIOUS TYPES OF MESSAGES------*/
-
-        /* CONNECT MESSAGE */
-        if (msg.msg_type == connection) {
-            
-            /* If the client is a prize */
-            if ((msg.prizes[0].ch != -1) && (spawn_prizes)){
-                
-                /* Spawn 5 prizes */
-                for (i = 0; i < 5; i++) {
-
-                    find_empty (&pos_x, &pos_y, player_data, bot_data, prize_data); // Find an empty space to spawn the prize
-
-                    /* Save the prize data */
-                    prize_data[i].ch = msg.prizes[i].ch;
-                    prize_data[i].hp = msg.prizes[i].hp;
-
-                    prize_data[i].pos_x = pos_x;
-                    prize_data[i].pos_y = pos_y;
-
-                    /* Draw prize */
-                    wmove(my_win, pos_y, pos_x);
-                    waddch(my_win, prize_data[i].ch);
-                    wrefresh(my_win);
-
-                    n_prizes++; // Increment the current number of prizes
-                }
-
-                spawn_prizes = 0; // We only do this process ONCE 
-
-            } 
-            
-            /* If the client is a player */
-            else if ((msg.player[0].ch != -1) && (current_players < 10)){
-
-                find_empty (&pos_x, &pos_y, player_data, bot_data, prize_data); // Find an empty space to spawn the prize
-
-                for (i = 0; i < 10; i++) {
-                    if (player_data[i].ch == -1) { // Get the first avaiable space in player_data
-
-                        /* Check if the ch choosen by the player is being used, if it is we assign a random ch to the player*/
-                        player_data[i].ch = ch_checker(msg.player[0].ch, player_data);
-
-                        /* Save the prize data */
-                        player_data[i].pos_x = pos_x;
-                        player_data[i].pos_y = pos_y;
-                        player_data[i].hp = 10;
-
-                        client_addr [i] = tmp;
-
-                        current_players++; // Increase the number of current players playing the game
-
-                        /* Draw the player */
-                        wmove(my_win, pos_y, pos_x);
-                        waddch(my_win, player_data[i].ch);
-                        wrefresh(my_win);	
-
-                        break;
-                    }
-                }
-
-                /* Prepare to send ball_information message */
-                msg.msg_type = ball_information;
-                msg.player_num = i;
-                
-                /* Copy the current data of the game */
-                for (i = 0; i < 10; i++) { 
-                    msg.player[i] = player_data[i];
-                    msg.bots[i] = bot_data[i];
-                    msg.prizes[i] = prize_data[i];
-                }
-
-                /* BALL_INFORMATION MESSAGE */
-                sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &tmp, client_addr_size);
-
-            } 
-
-            /* Connect from a player and we already have 10 players in the game */
-            else if ((msg.player[0].ch != -1) && (current_players == 10)) {
-
-                msg.msg_type = lobby_full;
-
-                /* LOBBY_FULL MESSAGE */
-                sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &tmp, client_addr_size);
-
-            }
-            
-            /* Update the message window */
-            show_all_health(message_win, player_data);
-
-        }
-
-        /* BALL_MOVEMENT MESSAGE */
-        if(msg.msg_type == ball_movement){
-            
-            if (inet_ntop(AF_INET, &client_addr[msg.player_num].sin_addr, remote_addr_str_saved, 100) == NULL){
-			    perror("converting saved addr: ");
-		    }
-
-            if (inet_ntop(AF_INET, &tmp.sin_addr, remote_addr_str_tmp, 100) == NULL){
-			    perror("converting tmp addr: ");
-		    }
-
-            /* Check if the client sending the message is in fact
-            a player in the game and is sending from the correct addr (anti-cheat) */
-            if ((player_data[msg.player_num].ch == msg.player[msg.player_num].ch) && (strcmp(remote_addr_str_saved, remote_addr_str_tmp) == 0)) {  
-                /* Save the old position */
-                pos_x = player_data[msg.player_num].pos_x;
-                pos_y = player_data[msg.player_num].pos_y;
-
-                /* Calculate the new position */
-                moove_player(&player_data[msg.player_num], msg.direction);
-
-                /* Check if the player hit another player */
-                for(int j = 0 ; j < 10; j++){
-
-                    /* Check if the position in the array has a player (different then the player moving) */
-                    if((player_data[j].ch != -1) && (j != msg.player_num)) {
-                        
-                        /* See if the player is in the position that our current player is moving into */
-                        if (player_data[j].pos_x == player_data[msg.player_num].pos_x && player_data[j].pos_y == player_data[msg.player_num].pos_y){ //Player hits another player
-
-                            /* If the player has less(or equal to) than 9 lives increment HP */
-                            if (player_data [msg.player_num].hp <= 9) {
-                                player_data [msg.player_num].hp++;
-                            }
-
-                            player_data [j].hp--; // Decrease HP of the player that was hit
-
-                            if (player_data [j].hp == 0) { // If the player that was hit has 0 lives then its GAME OVER
-
-                                /* HEALTH_0 MESSAGE */
-                                msg.msg_type = health_0;
-
-                                sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[j], client_addr_size);
-
-                                /* Take the player out of the game */
-                                wmove(my_win, player_data [j].pos_y, player_data [j].pos_x);
-                                waddch(my_win,' ');
-
-                                player_data [j].ch = -1;
-                                current_players--;
-                            } 
-
-                            clear_to_move = 0; // Can't move into new position
-
-                            break;
-                        }
-                    }
-
-                    /* Check if the player hit a bot */
-                    if (bot_data[j].ch != -1) {
-
-                        /* Player hits a bot */
-                        if ((bot_data[j].pos_x == player_data[msg.player_num].pos_x) && (bot_data[j].pos_y == player_data[msg.player_num].pos_y)){
-
-                            clear_to_move = 0; // Can't move into new position
-                            break;
-                        } 
-
-                    }
-                    
-                    /* Check if the player hit a prize */
-                    if (prize_data[j].ch != -1){
-
-                        /* Player hits a prize */
-                        if ((prize_data[j].pos_x == player_data[msg.player_num].pos_x) && (prize_data[j].pos_y == player_data[msg.player_num].pos_y)){
-
-                            /* Increase player hp by the value of the prize */
-                            player_data[msg.player_num].hp += prize_data[j].hp;
-
-                            /* The hp of the player must not reach values bigger than 10 */
-                            if (player_data[msg.player_num].hp > 10) {
-
-                                player_data[msg.player_num].hp = 10;
-
-                            }
-                            
-                            /* Take the prize out of the game */
-                            prize_data[j].ch = -1;
-                            n_prizes--;
-
-                            break;
-                        } 
-
-                    }
-                }
-
-                if (clear_to_move) { // Go into new position
-
-                    /* Delete player from old position */
-                    wmove(my_win, pos_y, pos_x);
-                    waddch(my_win,' ');
-
-                    /* Draw player in the new position */
-                    wmove(my_win, player_data[msg.player_num].pos_y, player_data[msg.player_num].pos_x);
-                    waddch(my_win, player_data[msg.player_num].ch);
-                    wrefresh(my_win);	
-
-                } else { // Keep the old coordenates
-        
-                    player_data[msg.player_num].pos_x = pos_x;
-                    player_data[msg.player_num].pos_y = pos_y;
-                }
-                
-                /* FIELD_STATUS MESSAGE */
-                msg.msg_type = field_status;
-
-                for (i = 0; i < 10; i++) { //Copy the current data
-                    msg.player[i] = player_data[i];
-                    msg.bots[i] = bot_data[i];
-                    msg.prizes[i] = prize_data[i];
-                }
-
-                sendto(sock_fd, &msg, sizeof(msg), 0, (const struct sockaddr *) &client_addr[msg.player_num], client_addr_size);
-
-                clear_to_move = 1;
-
-            } 
-
-            /* Update the message window */
-            show_all_health(message_win, player_data);
-        }
-
     }
 
     /* End curses mode */
