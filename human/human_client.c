@@ -144,7 +144,7 @@ void * listen_loop_thread(void * arg){
         n_bytes = recv(thread_args->socket_fd, &thread_args->msg, sizeof(message_t), 0);
         if (n_bytes!= sizeof(message_t)){
             perror("read");
-            exit(-1);
+            return 0;
         }
 
         /* MESSAGE RECEIVED PROCESSING */
@@ -180,7 +180,7 @@ void * listen_loop_thread(void * arg){
             show_all_health(thread_args->message_win, thread_args->msg.player);
 
         } else if (thread_args->msg.msg_type == health_0){
-            /* Print player HP in message window */
+            /* Print text in message window */
             mvwprintw(thread_args->message_win, 1, 1, "                  ");
             mvwprintw(thread_args->message_win, 1, 1, "   GAME OVER :(   ");
             mvwprintw(thread_args->message_win, 2, 1, "                  ");
@@ -197,7 +197,7 @@ void * listen_loop_thread(void * arg){
             /* countdown */
             for(int i = 9; (i > 0 && *thread_args->game_state == countdown); i--){
                 mvwprintw(thread_args->message_win, 4, 1, "                  ");
-                mvwprintw(thread_args->message_win, 6, 1, " %d seconds        ", i);
+                mvwprintw(thread_args->message_win, 4, 1, " %d seconds        ", i);
                 wrefresh(thread_args->message_win);
                 sleep(1);
             }
@@ -208,16 +208,32 @@ void * listen_loop_thread(void * arg){
                 *thread_args->game_state = game_over;
                 pthread_mutex_unlock(thread_args->lock);
 
-                endwin();
-                close(thread_args->socket_fd);
-                return 0;
+                mvwprintw(thread_args->message_win, 3, 1, "                  ");
+                mvwprintw(thread_args->message_win, 3, 1, " exit.            ");
+                mvwprintw(thread_args->message_win, 4, 1, "                  ");
+                mvwprintw(thread_args->message_win, 5, 1, " See you soon!    ");
+                wrefresh(thread_args->message_win);
+                sleep(1);
+
+                break;
 
             } else if (*thread_args->game_state == in_game) {
+                
+                /* send reconnect message to server */
+                thread_args->msg.msg_type = reconnect;
+                send(thread_args->socket_fd, &thread_args->msg, sizeof(message_t), 0);
+
+                /* Print player HP in message window */
                 show_all_health(thread_args->message_win, thread_args->msg.player);
             }
 
         }
     }
+
+    /* close tcp socket */
+    close(thread_args->socket_fd);
+    return 0;
+
 }
 
 /* main */
@@ -376,18 +392,15 @@ int main(int argc, char *argv[]){
     args_thread.game_state = &game_state;
     args_thread.lock = &lock;
 
-
     /* Create threads */
-    pthread_t thread_id;
-    pthread_create(&thread_id, NULL, &playing_loop_thread, (void *) &args_thread);
-    pthread_create(&thread_id, NULL, &listen_loop_thread, (void *) &args_thread);
+    pthread_t thread_id[2];
+    pthread_create(&thread_id[0], NULL, &playing_loop_thread, (void *) &args_thread);
+    pthread_create(&thread_id[1], NULL, &listen_loop_thread, (void *) &args_thread);
 
-    pthread_join(thread_id, NULL);
-
-
+    pthread_join(thread_id[0], NULL);
+    pthread_join(thread_id[1], NULL);
 
     endwin();
-    close(socket_fd);
 
     printf("Disconnected\n");
 
