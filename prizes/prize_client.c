@@ -79,10 +79,10 @@ int main(int argc, char * argv[]){
     while(1){
 
         sleep(5);
+        srand(clock());
 
         printf("sending prize_spawn\n");
         /* Generate new prize */
-        srand(clock());
 
         /* Generate number between 1 and 5 and store the ASCII value */
         msg.prizes[0].hp = (rand() % 5) + 1;

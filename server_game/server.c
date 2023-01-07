@@ -23,29 +23,43 @@ int generate_direction(){
 * Function that updates the coordenates of 
 * a player with a given direction; 
 */
-void moove_player (int *pos_x, int *pos_y, int direction){
+void moove_player (int *pos_x, int *pos_y, int direction, WINDOW * msg_win){
 
     if (direction == KEY_UP){
-        if (pos_y  != 1){
-            pos_y --;
+        if (*pos_y != 1){
+            *pos_y = *pos_y - 1;
         }
+        
+        mvwprintw(msg_win, 2, 1, "                  ");
+        mvwprintw(msg_win, 2, 1, " y = %d           ", *pos_y);
+        wrefresh(msg_win);
     }
 
     if (direction == KEY_DOWN){
-        if (pos_y  != WINDOW_SIZE-2){
-            pos_y ++;
+        if (*pos_y != WINDOW_SIZE-2){
+            *pos_y = *pos_y + 1;
         }
+        mvwprintw(msg_win, 2, 1, "                  ");
+        mvwprintw(msg_win, 2, 1, " y = %d           ", *pos_y);
+        wrefresh(msg_win);
     }
 
     if (direction == KEY_LEFT){
-        if (pos_x  != 1){
-            pos_x --;
+        if (*pos_x != 1){
+            *pos_x = *pos_x - 1;
         }
+        mvwprintw(msg_win, 3, 1, "                  ");
+        mvwprintw(msg_win, 3, 1, " x = %d           ", *pos_x);
+        wrefresh(msg_win);
     }
 
-    if (direction == KEY_RIGHT)
-        if (pos_x  != WINDOW_SIZE-2){
-            pos_x ++;
+    if (direction == KEY_RIGHT){
+        if (*pos_x != WINDOW_SIZE-2){
+            *pos_x = *pos_x + 1;
+        }
+        mvwprintw(msg_win, 3, 1, "                  ");
+        mvwprintw(msg_win, 3, 1, " x = %d           ", *pos_x);
+        wrefresh(msg_win);
     }
 }
 
@@ -134,6 +148,7 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 
     int i, j = 0;
 
+    /* clearing the screen */
     for(i = 1; i < 6; i++){
         mvwprintw(message_win, i, 1, "                  ");
     }
@@ -147,6 +162,7 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 
     wrefresh(message_win);
 }
+
 
 void * bot_loop(void * arg){
 
@@ -190,7 +206,7 @@ void * bot_loop(void * arg){
             pos_y = bot->bot_data[i].pos_y;
 
             /* Calculate the new position */
-            moove_player(&pos_x, &pos_y, generate_direction());
+            moove_player(&pos_x, &pos_y, generate_direction(), bot->message_win);
 
             /* Check if the bot hit something */
             for(int j = 0 ; j < 10; j++){
@@ -208,11 +224,8 @@ void * bot_loop(void * arg){
                             /* HEALTH_0 MESSAGE */
                             msg.msg_type = health_0;
 
-                            if (send(bot->con_socket[j], &msg, sizeof(msg), 0) < 0) {
-                                printf("Can't send\n");
-                                return -1;
-                            }
-                            
+                            send(bot->con_socket[j], &msg, sizeof(msg), 0);
+                                
                             wmove(bot->my_win, bot->player_data[j].pos_y, bot->player_data[j].pos_x);
                             waddch(bot->my_win,' ');
 
@@ -287,6 +300,8 @@ void * prize_loop(void * arg){
     
         /* Spawn the number of prizes given in player_num */
         for (i = 0; i < 5; i++) {
+
+            srand(clock());
             
             pthread_mutex_lock(&prize->lock);
     
@@ -296,7 +311,7 @@ void * prize_loop(void * arg){
             prize->prize_data[i].hp = (rand() % 5) + 1;
             prize->prize_data[i].pos_x = pos_x;
             prize->prize_data[i].pos_y = pos_y;
-            prize->prize_data[i].ch = prize->prize_data[0].hp + 48;
+            prize->prize_data[i].ch = prize->prize_data[i].hp + 48;
             prize->n_prizes++;
     
             /* Draw prize */
@@ -311,10 +326,12 @@ void * prize_loop(void * arg){
         while(1) {
     
             sleep(5);
+
+            srand(clock());
     
             pthread_mutex_lock(&prize->lock);
     
-            for (i = 0; i < prize->n_prizes; i++) {
+            for (i = 0; i < 10; i++) {
     
                 
                 if (prize->prize_data[i].ch == -1) {
@@ -326,13 +343,15 @@ void * prize_loop(void * arg){
                     prize->prize_data[i].hp = (rand() % 5) + 1;
                     prize->prize_data[i].pos_x = pos_x;
                     prize->prize_data[i].pos_y = pos_y;
-                    prize->prize_data[i].ch = prize->prize_data[0].hp + 48;
+                    prize->prize_data[i].ch = prize->prize_data[i].hp + 48;
                     prize->n_prizes++;
     
                     /* Draw prize */
                     wmove(prize->my_win, pos_y, pos_x);
                     waddch(prize->my_win, prize->prize_data[i].ch);
                     wrefresh(prize->my_win);
+
+                    break;
                 }
             }
             pthread_mutex_unlock(&prize->lock);
@@ -406,14 +425,17 @@ void * player_loop(void * arg){
 
         if(msg.msg_type == ball_movement){
 
+            pthread_mutex_lock(&player->lock); 
+        
             /* Check if the client sending the message is in fact
             a player in the game (anti-cheat) */
             if (player->player_data[msg.player_num].ch == msg.player[msg.player_num].ch) { 
 
-                pthread_mutex_lock(&player->lock); 
+                pos_x = player->player_data[self].pos_x;
+                pos_y = player->player_data[self].pos_y;
 
                 /* Calculate the new position */
-                moove_player(&pos_x,&pos_y, msg.direction);
+                moove_player(&pos_x,&pos_y, msg.direction, player->message_win);
 
                 /* Check if the player hit another player */
                 for(int j = 0 ; j < 10; j++){
@@ -532,6 +554,7 @@ void * player_loop(void * arg){
 int main(int argc, char *argv[])
 {	
     int i;
+    message_t msg;
 
     /* Create the socket for the server */
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -597,7 +620,7 @@ int main(int argc, char *argv[])
     }
 
     serv_arg.n_prizes = 0;
-    serv_arg.n_bots = argv[1];
+    serv_arg.n_bots = atoi(argv[1]);
     serv_arg.n_players = 0; 
 
     if (pthread_mutex_init(&serv_arg.lock, NULL) != 0)
@@ -608,11 +631,12 @@ int main(int argc, char *argv[])
 
     pthread_t thread_id[N_THREADS];
     pthread_create(&thread_id[10], NULL, &bot_loop, (void *) &serv_arg);
+    pthread_create(&thread_id[11], NULL, &prize_loop, (void *) &serv_arg);
 
     while (1)
     {   
+        new_con = accept(sock_fd, (struct sockaddr*)&client_addr, &client_addr_size);
         if (serv_arg.n_players < 10) {
-            new_con = accept(sock_fd, (struct sockaddr*)&client_addr, &client_addr_size);
 
             for (i = 0; i < 10; i++) {
                 if (serv_arg.player_data[i].ch == -1) { // Get the first avaiable space in player_data
@@ -624,13 +648,16 @@ int main(int argc, char *argv[])
                 }
             }
         
-            pthread_create(&thread_id[serv_arg.n_players], NULL, &player_loop, (void *) &serv_arg);
+            pthread_create(&thread_id[i], NULL, &player_loop, (void *) &serv_arg);
 
             pthread_mutex_lock(&serv_arg.lock);
 
             serv_arg.n_players++;
 
             pthread_mutex_unlock(&serv_arg.lock);
+        } else {
+            msg.msg_type = lobby_full;
+            send(new_con, &msg, sizeof(msg), 0);
         }
     }
 

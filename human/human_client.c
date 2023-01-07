@@ -84,6 +84,7 @@ void * playing_loop_thread(void * arg){
                 thread_args->msg.direction = key;
                 thread_args->msg.player[thread_args->msg.player_num] = *thread_args->player;
 
+
                 /* Send ball_movement to server */
                 n_bytes = sendto(thread_args->socket_fd, &thread_args->msg, sizeof(message_t), 0, (const struct sockaddr *) &thread_args->server_addr, sizeof(thread_args->server_addr));
                 if (n_bytes!= sizeof(message_t)){
