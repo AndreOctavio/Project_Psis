@@ -164,6 +164,35 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 }
 
 
+/* send_all_field_status() :
+ * Function that sends the status of the field
+ * to all connected players;
+ */
+void send_all_field_status(server_args_t * info){
+
+    int n_bytes;
+    message_t msg;
+
+    msg.msg_type = field_status;
+    memcpy(msg.player, info->player_data, sizeof(player_info_t) * 10);
+    memcpy(msg.bots, info->bot_data, sizeof(player_info_t) * 10);
+    memcpy(msg.prizes, info->prize_data, sizeof(player_info_t) * 10);
+
+    for (int i = 0; i < info->n_players; i++){
+        if (info->player_data[i].ch == -1){
+            continue;
+        }
+
+        msg.player_num = i;
+        n_bytes = send(info->con_socket[i], &msg, sizeof(message_t), 0);
+        if (n_bytes!= sizeof(message_t)){
+            perror("write");
+            exit(-1);
+        }
+    }
+
+}
+
 void * bot_loop(void * arg){
 
     server_args_t * bot = (server_args_t *) arg;

@@ -20,7 +20,7 @@
 #define SOCK_PORT 5002
 #define N_THREADS 12
 
-typedef enum msg_type_t {connection, ball_information, ball_movement, field_status, health_0, disconnect, lobby_full, prize_spawn, continue_game} msg_type_t;
+typedef enum msg_type_t {connection, ball_information, ball_movement, field_status, health_0, reconnect, lobby_full, prize_spawn, continue_game} msg_type_t;
 typedef enum direction_t {UP, DOWN, LEFT, RIGHT} direction_t;
 typedef enum game_state_t {in_game, countdown, game_over} game_state_t;
 
