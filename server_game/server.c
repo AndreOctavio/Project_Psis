@@ -420,15 +420,20 @@ void * player_loop(void * arg){
         /* Receive message from the clients */
         n_bytes = recv(player->con_socket[self], &msg, sizeof(message_t), 0);
 
-        if (n_bytes!= sizeof(message_t)){
+        if(n_bytes != sizeof(message_t)){
+
+            if(n_bytes == 0) {
+
+                player->player_data[self].ch = -1;
+                player->n_players--;
+                close(player->con_socket[self]);
+
+                waddch(player->my_win, ' ');
+                wrefresh(player->my_win);
+
+                return 0;
+            }
             continue;
-        } else if (n_bytes == 0) {
-
-            player->player_data[self].ch = -1;
-            player->n_players--;
-            close(player->con_socket[self]);
-
-            return 0;
         }
 
         /* CONNECT MESSAGE */

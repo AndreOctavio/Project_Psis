@@ -17,7 +17,7 @@
 #include<ctype.h>
 
 #define WINDOW_SIZE 20
-#define SOCK_PORT 5002
+#define SOCK_PORT 5003
 #define N_THREADS 12
 
 typedef enum msg_type_t {connection, ball_information, ball_movement, field_status, health_0, reconnect, lobby_full, prize_spawn, continue_game} msg_type_t;
