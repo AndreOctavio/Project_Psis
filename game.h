@@ -53,6 +53,7 @@ typedef struct thread_args_t
     message_t msg;
     player_info_t * player;
     game_state_t * game_state;
+    pthread_mutex_t * lock;
 
 } thread_args_t;
 
