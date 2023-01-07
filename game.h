@@ -75,6 +75,8 @@ typedef struct server_args_t
     int n_players;
     int n_prizes;
 
+    int tmp_self;
+
     pthread_mutex_t lock;
 } server_args_t;
 
