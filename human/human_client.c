@@ -46,7 +46,11 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 
     for (i = 0; i < 10; i++){
         if (player_data[i].ch != -1){
-            mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c-> %d ", player_data[i].ch, player_data[i].hp);
+            if(player_data[i].hp == 0){
+                mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c->Dead", player_data[i].ch);
+            } else {
+                mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c-> %d ", player_data[i].ch, player_data[i].hp);
+            }
             j++;
         }
     }
@@ -173,7 +177,6 @@ void * listen_loop_thread(void * arg){
                     /* Draw all the bots */
                     draw_player(thread_args->my_win, &thread_args->msg.prizes[i], 1, 3);
                 }
-                thread_args->msg.bots[i].ch = -2;
             }
             wrefresh(thread_args->my_win);
             /* Print player HP in message window */
@@ -192,19 +195,29 @@ void * listen_loop_thread(void * arg){
             sleep(1);
             /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
 
+            pthread_mutex_lock(thread_args->lock);
             *thread_args->game_state = countdown;
+            pthread_mutex_unlock(thread_args->lock);
 
             /* countdown */
-            for(int i = 9; (i > 0 && *thread_args->game_state == countdown); i--){
+            for(int i = 9; (i > 0); i--){
+
+                pthread_mutex_lock(thread_args->lock);
+                if(*thread_args->game_state != countdown){
+                    pthread_mutex_unlock(thread_args->lock);
+                    break;
+                }
+                pthread_mutex_unlock(thread_args->lock);
+
                 mvwprintw(thread_args->message_win, 4, 1, "                  ");
                 mvwprintw(thread_args->message_win, 4, 1, " %d seconds        ", i);
                 wrefresh(thread_args->message_win);
                 sleep(1);
             }
 
+            pthread_mutex_lock(thread_args->lock);
             if(*thread_args->game_state == countdown){
 
-                pthread_mutex_lock(thread_args->lock);
                 *thread_args->game_state = game_over;
                 pthread_mutex_unlock(thread_args->lock);
 
@@ -218,6 +231,8 @@ void * listen_loop_thread(void * arg){
                 break;
 
             } else if (*thread_args->game_state == in_game) {
+
+                pthread_mutex_unlock(thread_args->lock);
                 
                 /* send reconnect message to server */
                 thread_args->msg.msg_type = reconnect;
@@ -225,7 +240,9 @@ void * listen_loop_thread(void * arg){
 
                 /* Print player HP in message window */
                 show_all_health(thread_args->message_win, thread_args->msg.player);
+                continue;
             }
+            pthread_mutex_unlock(thread_args->lock);
 
         }
     }
@@ -273,7 +290,7 @@ int main(int argc, char *argv[]){
 
     /* Set server address */
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(SOCK_PORT);
+	server_addr.sin_port = htons(port);
     server_addr.sin_addr.s_addr = inet_addr(server_address);
 
 	if(inet_pton(AF_INET, server_address, &server_addr.sin_addr) < 1){
