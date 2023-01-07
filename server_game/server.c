@@ -217,6 +217,12 @@ void * bot_loop(void * arg){
                     /* See if the player is in the position that the bot is moving into */
                     if (bot->player_data[j].pos_x == pos_x && bot->player_data[j].pos_y == pos_y){ //Bot hits another player
 
+                        if (bot->player_data[j].hp == 0) {
+    
+                                clear_to_move = 0;
+                                break;
+                        }
+
                         bot->player_data[j].hp--; // Decrease HP of the player that was hit
 
                         if (bot->player_data[j].hp == 0) { // If the player that was hit has 0 lives then its GAME OVER
@@ -423,7 +429,8 @@ void * player_loop(void * arg){
             pthread_mutex_unlock(&player->lock);
         }
 
-        if(msg.msg_type == ball_movement){
+        /* BALL_MOVEMENT MESSAGE */
+        else if(msg.msg_type == ball_movement){
 
             pthread_mutex_lock(&player->lock); 
         
@@ -445,6 +452,12 @@ void * player_loop(void * arg){
                         
                         /* See if the player is in the position that our current player is moving into */
                         if (player->player_data[j].pos_x == pos_x && player->player_data[j].pos_y == pos_y){ //Player hits another player
+
+                            if (player->player_data[j].hp == 0) {
+    
+                                clear_to_move = 0;
+                                break;
+                            }
 
                             /* If the player has less(or equal to) than 9 lives increment HP */
                             if (player->player_data [self].hp <= 9) {
@@ -545,6 +558,16 @@ void * player_loop(void * arg){
             show_all_health(player->message_win, player->player_data);
 
             pthread_mutex_unlock(&player->lock);
+        }
+
+        else if (msg.msg_type = reconnect) {
+
+            pthread_mutex_lock(&player->lock);
+
+            player->player_data[self].hp = 10;
+
+            pthread_mutex_unlock(&player->lock);
+
         }
     }
 
