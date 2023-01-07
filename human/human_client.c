@@ -56,10 +56,10 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 
 
 /**
- * @brief código da thread. itera sobre o array rand_num_array e verifica se os numero são primos
+ * @brief thread that handles the game
  * 
- * @param arg indica da thread. É usado para cada threda saber que valores ler do array
- * @return void* numero de primos encontrados
+ * @param arg
+ * @return 0
  */
 void * playing_loop_thread(void * arg){
 
@@ -94,7 +94,10 @@ void * playing_loop_thread(void * arg){
 
         /* if this is during the countdown, the ball goes back to the game with full health */
         } else if (*thread_args->game_state == countdown){
+
+            pthread_mutex_lock(thread_args->lock);
             *thread_args->game_state = in_game;
+            pthread_mutex_unlock(thread_args->lock);
 
             /* Set continue_game message */
             thread_args->msg.msg_type = continue_game;
@@ -181,18 +184,28 @@ void * listen_loop_thread(void * arg){
             mvwprintw(thread_args->message_win, 1, 1, "   GAME OVER :(   ");
             mvwprintw(thread_args->message_win, 2, 1, "                  ");
             mvwprintw(thread_args->message_win, 2, 1, " Press any key to ");
-            mvwprintw(thread_args->message_win, 3, 1, " try again, ya got");
+            mvwprintw(thread_args->message_win, 3, 1, " go back, ya got  ");
             mvwprintw(thread_args->message_win, 4, 1, " 10 seconds       ");
             mvwprintw(thread_args->message_win, 5, 1, "                  ");
             wrefresh(thread_args->message_win);
+            sleep(1);
             /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
 
             *thread_args->game_state = countdown;
 
-            sleep(10);
+            /* countdown */
+            for(int i = 9; (i > 0 && *thread_args->game_state == countdown); i--){
+                mvwprintw(thread_args->message_win, 4, 1, "                  ");
+                mvwprintw(thread_args->message_win, 6, 1, " %d seconds        ", i);
+                wrefresh(thread_args->message_win);
+                sleep(1);
+            }
 
             if(*thread_args->game_state == countdown){
+
+                pthread_mutex_lock(thread_args->lock);
                 *thread_args->game_state = game_over;
+                pthread_mutex_unlock(thread_args->lock);
 
                 endwin();
                 close(thread_args->socket_fd);
@@ -215,10 +228,11 @@ int main(int argc, char *argv[]){
 
 	struct sockaddr_in server_addr;
     char server_address [100];
-    int socket_fd;
+    int socket_fd, port;
     int n_bytes;
 
     strcpy(server_address, argv[1]);
+    port = atoi(argv[2]);
     
     /* Player selects its character */
     printf("   *    Welcome to the game!    *   \n");
@@ -282,7 +296,7 @@ int main(int argc, char *argv[]){
 
     /* Receive Ball_information or lobby_full message from server */
     n_bytes = recv(socket_fd, &msg, sizeof(message_t), 0);
-    if (n_bytes!= sizeof(message_t)){
+    if (n_bytes != sizeof(message_t)){
         perror("read");
         exit(-1);
     }
@@ -349,6 +363,7 @@ int main(int argc, char *argv[]){
     /* Setup arguments to call threads */
     struct thread_args_t args_thread;
     game_state_t game_state = in_game;
+    pthread_mutex_t lock;
 
     args_thread.socket_fd = socket_fd;
     args_thread.my_win = my_win;
@@ -358,6 +373,7 @@ int main(int argc, char *argv[]){
     args_thread.character = character[0];
     args_thread.msg = msg;
     args_thread.game_state = &game_state;
+    args_thread.lock = &lock;
 
 
     /* Create threads */
