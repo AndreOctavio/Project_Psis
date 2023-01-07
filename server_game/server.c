@@ -727,6 +727,11 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (pthread_mutex_destroy(&serv_arg.lock) != 0) {                                     
+        perror("pthread_mutex_destroy() error");                                    
+        exit(2);                                                                    
+    }  
+
     /* End curses mode */
   	endwin();
 
