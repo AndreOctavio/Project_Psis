@@ -40,10 +40,12 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 
     int i, j = 0;
 
+    /* Clear message window */
     for(i = 1; i < 6; i++){
         mvwprintw(message_win, i, 1, "                  ");
     }
 
+    /* Print health of all players */
     for (i = 0; i < 10; i++){
         if (player_data[i].ch != -1){
             if(player_data[i].hp == 0){
@@ -54,18 +56,19 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
             j++;
         }
     }
+    
     wrefresh(message_win);
 
 }
 
 
 /**
- * @brief thread that handles the game
+ * @brief thread that handles keyboard input from the user
  * 
- * @param arg
- * @return 0
+ * @param arg arguments needed for the thread
+ * @return nothing
  */
-void * playing_loop_thread(void * arg){
+void * keyboard_thread(void * arg){
 
     thread_args_t * thread_args = (thread_args_t *) arg;
 
@@ -75,7 +78,6 @@ void * playing_loop_thread(void * arg){
 
     while(key != 27 && key!= 'q'){
 
-        //printf("waiting for key\n");
         key = wgetch(thread_args->my_win);
 
         /* Checks if the ball is in game or in some other state */
@@ -100,30 +102,21 @@ void * playing_loop_thread(void * arg){
         /* if this is during the countdown, the ball goes back to the game with full health */
         } else if (*thread_args->game_state == countdown){
 
+
+            /* Set game state to in_game so that the communication thread knows a key has been pressed */
             pthread_mutex_lock(thread_args->lock);
             *thread_args->game_state = in_game;
             pthread_mutex_unlock(thread_args->lock);
 
-            /* Set continue_game message */
-            thread_args->msg.msg_type = continue_game;
-
-            /* Send continue_game to server */
-            n_bytes = sendto(thread_args->socket_fd, &thread_args->msg, sizeof(message_t), 0, (const struct sockaddr *) &thread_args->server_addr, sizeof(thread_args->server_addr));
-            if (n_bytes!= sizeof(message_t)){
-                perror("write");
-                exit(-1);
-            }
+        /* if the game is over, close thread */
         } else if (*thread_args->game_state == game_over){
             break;
         }
 
     }
 
-    printf("ending\n");
-
     /* close tcp socket */
     close(thread_args->socket_fd);
-    sleep(1);
 
     return 0;
 
@@ -131,19 +124,20 @@ void * playing_loop_thread(void * arg){
 
 
 /**
- * @brief thread vai receber os field_status do servidor e vai atualizar a janela de jogo
- *  se o jogador morrer, a thread vai terminar ao detetar o fecho da socket
+ * @brief this thread will receive the messages from the server and update the game window
+ * If the player dies, the thread will end when it detects the closure of the socket
  * 
- * @param arg indica da thread. É usado para cada threda saber que valores ler do array
- * @return void* numero de primos encontrados
+ * @param arg arguments needed for the thread
+ * @return nothing
  */
-void * listen_loop_thread(void * arg){
+void * communication_thread(void * arg){
     
     int n_bytes;
     thread_args_t * thread_args = (thread_args_t *) arg;
 
+    /* Receiving loop */
     while(1){
-        //printf("waiting for msg\n");
+        
         /* Receive msg from server */
         n_bytes = recv(thread_args->socket_fd, &thread_args->msg, sizeof(message_t), 0);
         if (n_bytes!= sizeof(message_t)){
@@ -155,10 +149,14 @@ void * listen_loop_thread(void * arg){
 
         /* Checks if message recv is field_status */
         if(thread_args->msg.msg_type == field_status){
-
+            
+            /* This section of code will draw the field status and update the windows */
             clear_screen(thread_args->my_win);
 
+            /* Draw all the players, bots and prizes */
             for(int i = 0; i < 10; i++){
+
+                /* If the player is in the game, draw it */
                 if(thread_args->msg.player[i].ch != -1){
 
                     /* If drawing this client's character, change color */
@@ -169,20 +167,25 @@ void * listen_loop_thread(void * arg){
                         draw_player(thread_args->my_win, &thread_args->msg.player[i], 1, 1);
                     }
                 }
+                /* If the bot is in the game, draw it */
                 if (thread_args->msg.bots[i].ch != -1){
                     /* Draw all the bots */
                     draw_player(thread_args->my_win, &thread_args->msg.bots[i], 1, 2);
                 }
+                /* If the prize is in the game, draw it */
                 if (thread_args->msg.prizes[i].ch != -1){
                     /* Draw all the bots */
                     draw_player(thread_args->my_win, &thread_args->msg.prizes[i], 1, 3);
                 }
             }
+            /* Refresh the window */
             wrefresh(thread_args->my_win);
             /* Print player HP in message window */
             show_all_health(thread_args->message_win, thread_args->msg.player);
 
+        /* If the message received is health_0 start the countdown */
         } else if (thread_args->msg.msg_type == health_0){
+
             /* Print text in message window */
             mvwprintw(thread_args->message_win, 1, 1, "                  ");
             mvwprintw(thread_args->message_win, 1, 1, "   GAME OVER :(   ");
@@ -193,8 +196,9 @@ void * listen_loop_thread(void * arg){
             mvwprintw(thread_args->message_win, 5, 1, "                  ");
             wrefresh(thread_args->message_win);
             sleep(1);
-            /************  REPLACE WITH TIME LOOP COUNTDOWN  **************/
 
+            /* Set game_state to countdown such that the keyboard thread 
+             * knows how to handle keyboard input */
             pthread_mutex_lock(thread_args->lock);
             *thread_args->game_state = countdown;
             pthread_mutex_unlock(thread_args->lock);
@@ -202,6 +206,8 @@ void * listen_loop_thread(void * arg){
             /* countdown */
             for(int i = 9; (i > 0); i--){
 
+                /* Checks if the keyboard thread has changed the state of the game
+                 * If the keyboard thread has detected an input it will change the game_state to in_game */
                 pthread_mutex_lock(thread_args->lock);
                 if(*thread_args->game_state != countdown){
                     pthread_mutex_unlock(thread_args->lock);
@@ -215,9 +221,13 @@ void * listen_loop_thread(void * arg){
                 sleep(1);
             }
 
+            /* If the game_state is still countdown, it means that the countdown has ended
+             * and the game is over */
             pthread_mutex_lock(thread_args->lock);
             if(*thread_args->game_state == countdown){
 
+                /* Set game_state to game_over such that the keyboard thread 
+                 * knows how to handle keyboard input */
                 *thread_args->game_state = game_over;
                 pthread_mutex_unlock(thread_args->lock);
 
@@ -230,6 +240,8 @@ void * listen_loop_thread(void * arg){
 
                 break;
 
+            /* If the game_state is in_game, it means that the keyboard thread has detected
+             * an input and the game is still going on */
             } else if (*thread_args->game_state == in_game) {
 
                 pthread_mutex_unlock(thread_args->lock);
@@ -370,11 +382,13 @@ int main(int argc, char *argv[]){
         exit(1);
     }
 
+    /* start color mode */
     start_color();
-    init_pair(1, COLOR_BLUE, COLOR_BLACK);
-    init_pair(2, COLOR_RED, COLOR_BLACK);
-    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(4, COLOR_MAGENTA, COLOR_BLACK);
+    /* initialize color pairs */
+    init_pair(1, COLOR_BLUE, COLOR_BLACK);      // other players in the game
+    init_pair(2, COLOR_RED, COLOR_BLACK);       // bot
+    init_pair(3, COLOR_YELLOW, COLOR_BLACK);    // prize
+    init_pair(4, COLOR_MAGENTA, COLOR_BLACK);   // client's player
 
     /* creates a window and draws a border */
     WINDOW * my_win = newwin(WINDOW_SIZE, WINDOW_SIZE, 0, 0);
@@ -388,11 +402,10 @@ int main(int argc, char *argv[]){
     wrefresh(message_win);
 
 
-
-
     /* Draw player in main window */
     draw_player(my_win, &player, true, 4);
     wrefresh(message_win);
+
 
     /* Setup arguments to call threads */
     struct thread_args_t args_thread;
@@ -411,12 +424,14 @@ int main(int argc, char *argv[]){
 
     /* Create threads */
     pthread_t thread_id[2];
-    pthread_create(&thread_id[0], NULL, &playing_loop_thread, (void *) &args_thread);
-    pthread_create(&thread_id[1], NULL, &listen_loop_thread, (void *) &args_thread);
+    pthread_create(&thread_id[0], NULL, &keyboard_thread, (void *) &args_thread);
+    pthread_create(&thread_id[1], NULL, &communication_thread, (void *) &args_thread);
 
+    /* Wait for threads to finish */
     pthread_join(thread_id[0], NULL);
     pthread_join(thread_id[1], NULL);
 
+    /* close ncurses */
     endwin();
 
     printf("Disconnected\n");
