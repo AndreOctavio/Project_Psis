@@ -17,8 +17,9 @@
 #include<ctype.h>
 
 #define WINDOW_SIZE 20
-#define SOCK_PORT 5003
-#define N_THREADS 12
+#define MAX_PLAYERS (WINDOW_SIZE - 2) * (WINDOW_SIZE - 2)
+
+//#define N_THREADS 12
 
 typedef enum msg_type_t {connection, ball_information, ball_movement, field_status, health_0, reconnect, lobby_full, prize_spawn, continue_game} msg_type_t;
 typedef enum direction_t {UP, DOWN, LEFT, RIGHT} direction_t;
@@ -36,7 +37,7 @@ typedef struct player_info_t
 typedef struct message_t
 {   
     msg_type_t msg_type;
-    player_info_t player[10];
+    player_info_t player[MAX_PLAYERS];
     player_info_t bots[10];
     player_info_t prizes[10];
     int player_num;
@@ -62,12 +63,13 @@ typedef struct server_args_t
     WINDOW * my_win;
     WINDOW * message_win;
 
-    int con_socket [10]; // Array to store the players addresses
+    int con_socket [MAX_PLAYERS]; // Array to store the players addresses
+    int free_space [WINDOW_SIZE - 2][WINDOW_SIZE - 2]; // Array that contains the positions that are free in the board
 
     /* player_data - stores all the info regarding the current players;
     *  bot_data - stores all the info regarding the bots in the game; 
     *  prize_data - stores all the info regarding the prizes in the game; */
-    player_info_t player_data[10]; 
+    player_info_t player_data[MAX_PLAYERS]; 
     player_info_t bot_data[10]; 
     player_info_t prize_data[10];
 
