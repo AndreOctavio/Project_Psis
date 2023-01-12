@@ -36,7 +36,7 @@ void clear_screen(WINDOW *win){
 /* show_all_health()
  * Function prints in the message window the health of all connected players
  */
-void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
+void show_all_health(WINDOW * message_win, player_info_t player_data[MAX_PLAYERS]){
 
     int i, j = 0;
 
@@ -45,7 +45,7 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
         mvwprintw(message_win, i, 1, "                  ");
     }
 
-    /* Print health of all players */
+    /* Print health of first 10 players */
     for (i = 0; i < 10; i++){
         if (player_data[i].ch != -1){
             if(player_data[i].hp == 0){
@@ -71,6 +71,9 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
 void * keyboard_thread(void * arg){
 
     thread_args_t * thread_args = (thread_args_t *) arg;
+    message_t msg;
+    
+    msg.player_num = thread_args->player_id;
 
     // /* Playing loop */
     int key = -1;
@@ -86,13 +89,13 @@ void * keyboard_thread(void * arg){
             if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN){
 
                 /* Set movement message */
-                thread_args->msg.msg_type = ball_movement;
-                thread_args->msg.direction = key;
-                thread_args->msg.player[thread_args->msg.player_num] = *thread_args->player;
+                msg.msg_type = ball_movement;
+                msg.direction = key;
+                msg.player[msg.player_num] = *thread_args->player;
 
 
                 /* Send ball_movement to server */
-                n_bytes = sendto(thread_args->socket_fd, &thread_args->msg, sizeof(message_t), 0, (const struct sockaddr *) &thread_args->server_addr, sizeof(thread_args->server_addr));
+                n_bytes = sendto(thread_args->socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &thread_args->server_addr, sizeof(thread_args->server_addr));
                 if (n_bytes!= sizeof(message_t)){
                     perror("write");
                     exit(-1);
@@ -132,59 +135,97 @@ void * keyboard_thread(void * arg){
  */
 void * communication_thread(void * arg){
     
-    int n_bytes;
+    int n_bytes, color;
     thread_args_t * thread_args = (thread_args_t *) arg;
+    msg_field_update msg;
+    message_t msg_send;
+    player_info_t player_data[MAX_PLAYERS];
 
     /* Receiving loop */
     while(1){
         
         /* Receive msg from server */
-        n_bytes = recv(thread_args->socket_fd, &thread_args->msg, sizeof(message_t), 0);
-        if (n_bytes!= sizeof(message_t)){
-            perror("read");
+        n_bytes = recv(thread_args->socket_fd, &msg, sizeof(msg_field_update), 0);
+        if (n_bytes!= sizeof(msg_field_update)){
+            perror("read_field_status");
             return 0;
         }
 
         /* MESSAGE RECEIVED PROCESSING */
 
         /* Checks if message recv is field_status */
-        if(thread_args->msg.msg_type == field_status){
+        if(msg.msg_type == field_status){
             
-            /* This section of code will draw the field status and update the windows */
-            clear_screen(thread_args->my_win);
-
-            /* Draw all the players, bots and prizes */
-            for(int i = 0; i < 10; i++){
-
-                /* If the player is in the game, draw it */
-                if(thread_args->msg.player[i].ch != -1){
-
-                    /* If drawing this client's character, change color */
-                    if(thread_args->msg.player[i].ch == thread_args->character){
-                        draw_player(thread_args->my_win, &thread_args->msg.player[i], 1, 4);
-                    } else {
-                        /* Draw all the players */
-                        draw_player(thread_args->my_win, &thread_args->msg.player[i], 1, 1);
-                    }
-                }
-                /* If the bot is in the game, draw it */
-                if (thread_args->msg.bots[i].ch != -1){
-                    /* Draw all the bots */
-                    draw_player(thread_args->my_win, &thread_args->msg.bots[i], 1, 2);
-                }
-                /* If the prize is in the game, draw it */
-                if (thread_args->msg.prizes[i].ch != -1){
-                    /* Draw all the bots */
-                    draw_player(thread_args->my_win, &thread_args->msg.prizes[i], 1, 3);
-                }
+            /* If drawing this client's character, change color */
+            if(msg.new_status.ch == thread_args->player->ch){
+                color = 4;
+            } else if (msg.new_status.ch == '*'){
+                color = 2;
+            } else if (msg.new_status.ch >= '1' && msg.new_status.ch <= '5'){
+                color = 3;
+            } else {
+                color = 1;
             }
+
+            pthread_mutex_lock(thread_args->lock);
+            /* Draw the player in the game window */
+            if(msg.old_status.ch != -1){
+                draw_player(thread_args->my_win, &msg.old_status, 0, color);
+            }
+            if(msg.new_status.ch != -1){
+                draw_player(thread_args->my_win, &msg.new_status, 1, color);
+            }
+
             /* Refresh the window */
             wrefresh(thread_args->my_win);
+
+            /* update local array of the player data */
+            player_data[msg.arr_position] = msg.new_status;
+
             /* Print player HP in message window */
-            show_all_health(thread_args->message_win, thread_args->msg.player);
+            show_all_health(thread_args->message_win, player_data);
+
+            pthread_mutex_unlock(thread_args->lock);
+
+
+            
+
+
+
+
+
+
+            // /* This section of code will draw the field status and update the windows */
+            // clear_screen(thread_args->my_win);
+
+            // /* Draw all the players, bots and prizes */
+            // for(int i = 0; i < 10; i++){
+
+            //     /* If the player is in the game, draw it */
+            //     if(thread_args->msg.player[i].ch != -1){
+
+            //         /* If drawing this client's character, change color */
+            //         if(thread_args->msg.player[i].ch == thread_args->character){
+            //             draw_player(thread_args->my_win, &thread_args->msg.player[i], 1, 4);
+            //         } else {
+            //             /* Draw all the players */
+            //             draw_player(thread_args->my_win, &thread_args->msg.player[i], 1, 1);
+            //         }
+            //     }
+            //     /* If the bot is in the game, draw it */
+            //     if (thread_args->msg.bots[i].ch != -1){
+            //         /* Draw all the bots */
+            //         draw_player(thread_args->my_win, &thread_args->msg.bots[i], 1, 2);
+            //     }
+            //     /* If the prize is in the game, draw it */
+            //     if (thread_args->msg.prizes[i].ch != -1){
+            //         /* Draw all the bots */
+            //         draw_player(thread_args->my_win, &thread_args->msg.prizes[i], 1, 3);
+            //     }
+            // }
 
         /* If the message received is health_0 start the countdown */
-        } else if (thread_args->msg.msg_type == health_0){
+        } else if (msg.msg_type == health_0){
 
             /* Print text in message window */
             mvwprintw(thread_args->message_win, 1, 1, "                  ");
@@ -222,7 +263,7 @@ void * communication_thread(void * arg){
             }
 
             /* If the game_state is still countdown, it means that the countdown has ended
-             * and the game is over */
+             * was not interrupted and the game is over */
             pthread_mutex_lock(thread_args->lock);
             if(*thread_args->game_state == countdown){
 
@@ -247,11 +288,11 @@ void * communication_thread(void * arg){
                 pthread_mutex_unlock(thread_args->lock);
                 
                 /* send reconnect message to server */
-                thread_args->msg.msg_type = reconnect;
-                send(thread_args->socket_fd, &thread_args->msg, sizeof(message_t), 0);
+                msg_send.msg_type = reconnect;
+                send(thread_args->socket_fd, &msg_send, sizeof(message_t), 0);
 
-                /* Print player HP in message window */
-                show_all_health(thread_args->message_win, thread_args->msg.player);
+                // /* Print player HP in message window */
+                // show_all_health(thread_args->message_win, thread_args->msg.player);
                 continue;
             }
             pthread_mutex_unlock(thread_args->lock);
@@ -343,7 +384,7 @@ int main(int argc, char *argv[]){
     /* Receive Ball_information or lobby_full message from server */
     n_bytes = recv(socket_fd, &msg, sizeof(message_t), 0);
     if (n_bytes != sizeof(message_t)){
-        perror("read");
+        perror("read_ball_info");
         exit(-1);
     }
 
@@ -402,23 +443,53 @@ int main(int argc, char *argv[]){
     wrefresh(message_win);
 
 
-    /* Draw player in main window */
-    draw_player(my_win, &player, true, 4);
-    wrefresh(message_win);
+    /* Draw all the players, bots and prizes */
+    for(int i = 0; i < 10; i++){
+
+        /* If the player is in the game, draw it */
+        if(msg.player[i].ch != -1){
+
+            /* If drawing this client's character, change color */
+            if(msg.player[i].ch == character[0]){
+                draw_player(my_win, &msg.player[i], 1, 4);
+            } else {
+                /* Draw all the players */
+                draw_player(my_win, &msg.player[i], 1, 1);
+            }
+        }
+        /* If the bot is in the game, draw it */
+        if (msg.bots[i].ch != -1){
+            /* Draw all the bots */
+            draw_player(my_win, &msg.bots[i], 1, 2);
+        }
+        /* If the prize is in the game, draw it */
+        if (msg.prizes[i].ch != -1){
+            /* Draw all the bots */
+            draw_player(my_win, &msg.prizes[i], 1, 3);
+        }
+    }
+
+    wrefresh(my_win);    // refresh the screen
 
 
     /* Setup arguments to call threads */
     struct thread_args_t args_thread;
     game_state_t game_state = in_game;
     pthread_mutex_t lock;
+    msg_field_update msg_field_status;
 
     args_thread.socket_fd = socket_fd;
     args_thread.my_win = my_win;
     args_thread.message_win = message_win;
     args_thread.server_addr = server_addr;
     args_thread.player = &player;
-    args_thread.character = character[0];
-    args_thread.msg = msg;
+    args_thread.player_id = msg.player_num;
+
+    //printf ("player_id: %d\n", args_thread.player_id);
+    fflush(stdout);
+
+    sleep(3);
+
     args_thread.game_state = &game_state;
     args_thread.lock = &lock;
 

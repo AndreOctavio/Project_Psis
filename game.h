@@ -17,6 +17,7 @@
 #include<ctype.h>
 
 #define WINDOW_SIZE 20
+#define MAX_PLAYERS WINDOW_SIZE * WINDOW_SIZE
 #define SOCK_PORT 5003
 #define N_THREADS 12
 
@@ -43,14 +44,22 @@ typedef struct message_t
     int direction;
 } message_t;
 
+typedef struct msg_field_update
+{
+    msg_type_t msg_type;
+    player_info_t old_status;
+    player_info_t new_status;
+    int arr_position;
+
+} msg_field_update;
+
 typedef struct thread_args_t
 {
     WINDOW * my_win;
     WINDOW * message_win;
     struct sockaddr_in server_addr;
     int socket_fd;
-    char character;
-    message_t msg;
+    int player_id;
     player_info_t * player;
     game_state_t * game_state;
     pthread_mutex_t * lock;

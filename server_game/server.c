@@ -131,19 +131,19 @@ char ch_checker (char character, player_info_t players[10]) {
 }
 
 
-/* show_all_health() :
- * Function prints in the message window
- * the health of all connected players;
+/* show_all_health()
+ * Function prints in the message window the health of all connected players
  */
-void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
+void show_all_health(WINDOW * message_win, player_info_t player_data[MAX_PLAYERS]){
 
     int i, j = 0;
 
-    /* clearing the screen */
+    /* Clear message window */
     for(i = 1; i < 6; i++){
         mvwprintw(message_win, i, 1, "                  ");
     }
 
+    /* Print health of first 10 players */
     for (i = 0; i < 10; i++){
         if (player_data[i].ch != -1){
             if(player_data[i].hp == 0){
@@ -154,8 +154,9 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
             j++;
         }
     }
-
+    
     wrefresh(message_win);
+
 }
 
 
@@ -163,24 +164,17 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[10]){
  * Function that sends the status of the field
  * to all connected players;
  */
-void send_all_field_status(server_args_t * info){
+void send_all_field_status(msg_field_update * msg, int socket[10], player_info_t players[MAX_PLAYERS]){
 
     int n_bytes;
-    message_t msg;
-
-    msg.msg_type = field_status;
-    memcpy(msg.player, info->player_data, sizeof(player_info_t) * 10);
-    memcpy(msg.bots, info->bot_data, sizeof(player_info_t) * 10);
-    memcpy(msg.prizes, info->prize_data, sizeof(player_info_t) * 10);
 
     for (int i = 0; i < 10; i++){
-        if (info->player_data[i].ch == -1){
+        if (players[i].ch == -1){
             continue;
         }
 
-        msg.player_num = i;
-        n_bytes = send(info->con_socket[i], &msg, sizeof(message_t), 0);
-        if (n_bytes!= sizeof(message_t)){
+        n_bytes = send(socket[i], msg, sizeof(msg_field_update), 0);
+        if (n_bytes!= sizeof(msg_field_update)){
             perror("Error sending..");
             exit(-1);
         }
@@ -200,7 +194,9 @@ void * bot_loop(void * arg){
 
     int pos_x, pos_y, n_bytes, i, clear_to_move = 1;
 
-    message_t msg;
+    message_t msg_ta_mal;
+
+    msg_field_update msg;
 
     /* Spawn the number of bots given in player_num */
     for (i = 0; i < bot->n_bots; i++) {
@@ -221,7 +217,11 @@ void * bot_loop(void * arg){
         wrefresh(bot->my_win);
 
         /* Send the change to all the clients */
-        send_all_field_status(bot);
+        msg.old_status.ch = -1;
+        msg.new_status = bot->bot_data[i];
+        msg.msg_type = field_status;
+        msg.arr_position = -1;
+        send_all_field_status(&msg, bot->con_socket, bot->player_data);
 
         pthread_mutex_unlock(&bot->lock);
 
@@ -233,7 +233,10 @@ void * bot_loop(void * arg){
 
         pthread_mutex_lock(&bot->lock);
 
+
         for (i = 0; i < bot->n_bots; i++) {
+
+            msg.old_status = bot->bot_data[i];
 
             /* Save the old position */
             pos_x = bot->bot_data[i].pos_x;
@@ -318,6 +321,12 @@ void * bot_loop(void * arg){
                 waddch(bot->my_win, '*');
                 wrefresh(bot->my_win);	
 
+                /* Send the change to all the players in the game */
+                msg.new_status = bot->bot_data[i];
+                msg.msg_type = field_status;
+                msg.arr_position = -1;
+                send_all_field_status(&msg, bot->con_socket, bot->player_data);
+
             }
 
             clear_to_move = 1;
@@ -326,9 +335,6 @@ void * bot_loop(void * arg){
         /* Update the message window */
         show_all_health(bot->message_win, bot->player_data);
 
-        /* Send the change to all the players in the game */
-        send_all_field_status(bot);
-
         pthread_mutex_unlock(&bot->lock);
     }
 }
@@ -336,6 +342,11 @@ void * bot_loop(void * arg){
 void * prize_loop(void * arg){
     
         server_args_t * prize = (server_args_t *) arg;
+        msg_field_update msg;
+
+        /* podemos meter tudo num array de prizes só
+            tipo player_info_t prize_data[10]
+            dps só enviar o field status */
     
         int pos_x, pos_y, i;
     
@@ -362,7 +373,11 @@ void * prize_loop(void * arg){
             wrefresh(prize->my_win);
 
             /* Send the change to all the players in the game */
-            send_all_field_status(prize);
+            msg.old_status.ch = -1;
+            msg.new_status = prize->prize_data[i];
+            msg.msg_type = field_status;
+            msg.arr_position = -1;
+            send_all_field_status(&msg, prize->con_socket, prize->player_data);
 
             pthread_mutex_unlock(&prize->lock);
     
@@ -402,7 +417,11 @@ void * prize_loop(void * arg){
             }
 
             /* Send the change to all the players in the game */
-            send_all_field_status(prize);
+            msg.old_status.ch = -1;
+            msg.new_status = prize->prize_data[i];
+            msg.msg_type = field_status;
+            msg.arr_position = -1;
+            send_all_field_status(&msg, prize->con_socket, prize->player_data);
 
             pthread_mutex_unlock(&prize->lock);
     
@@ -419,6 +438,7 @@ void * player_loop(void * arg){
     int pos_x, pos_y, n_bytes, clear_to_move = 1;
 
     message_t msg;
+    msg_field_update msg_update;
 
     while (1) {
 
@@ -487,7 +507,11 @@ void * player_loop(void * arg){
             }
 
             /* Send the change to all the players in the game */
-            send_all_field_status(player);
+            msg_update.old_status.ch = -1;
+            msg_update.new_status = player->player_data[self];
+            msg_update.msg_type = field_status;
+            msg_update.arr_position = -1;
+            send_all_field_status(&msg_update, player->con_socket, player->player_data);
 
             pthread_mutex_unlock(&player->lock);
         }
@@ -500,6 +524,9 @@ void * player_loop(void * arg){
             /* Check if the client sending the message is in fact
             a player in the game (anti-cheat) */
             if (player->player_data[msg.player_num].ch == msg.player[msg.player_num].ch) { 
+
+                /* Save the current position of the player */
+                msg_update.old_status = player->player_data[self];
 
                 pos_x = player->player_data[self].pos_x;
                 pos_y = player->player_data[self].pos_y;
@@ -603,7 +630,6 @@ void * player_loop(void * arg){
                 }
                 
                 /* FIELD_STATUS MESSAGE */
-                msg.msg_type = field_status;
 
                 for (int i = 0; i < 10; i++) { //Copy the current data
                     msg.player[i] = player->player_data[i];
@@ -611,12 +637,19 @@ void * player_loop(void * arg){
                     msg.prizes[i] = player->prize_data[i];
                 }
 
-                n_bytes = send(player->con_socket[self], &msg, sizeof(msg), 0);
+                // n_bytes = send(player->con_socket[self], &msg, sizeof(msg), 0);
 
-                if (n_bytes!= sizeof(message_t)){
-                    perror("Error sending..");
-                    exit(-1);
-                }   
+                // if (n_bytes!= sizeof(message_t)){
+                //     perror("Error sending..");
+                //     exit(-1);
+                // }
+
+
+                /* Send the change to all the players in the game */
+                msg_update.new_status = player->player_data[self];
+                msg_update.msg_type = field_status;
+                msg_update.arr_position = self;
+                send_all_field_status(&msg_update, player->con_socket, player->player_data);
 
                 clear_to_move = 1;
 
@@ -625,8 +658,6 @@ void * player_loop(void * arg){
             /* Update the message window */
             show_all_health(player->message_win, player->player_data);
             
-            /* Send the change to all the players in the game */
-            send_all_field_status(player);
 
             pthread_mutex_unlock(&player->lock);
 
@@ -638,7 +669,11 @@ void * player_loop(void * arg){
             player->player_data[self].hp = 10;
 
             /* Send the change to all the players in the game */
-            send_all_field_status(player);
+            msg_update.old_status.ch = -1;
+            msg_update.new_status = player->player_data[self];
+            msg_update.msg_type = field_status;
+            msg_update.arr_position = self;
+            send_all_field_status(&msg_update, player->con_socket, player->player_data);
 
             pthread_mutex_unlock(&player->lock);
 
@@ -763,6 +798,8 @@ int main(int argc, char *argv[])
                     break;
                 }
             }
+
+
 
             /* Lauch thread for the new player */
             pthread_create(&thread_id[i], NULL, &player_loop, (void *) &serv_arg);
