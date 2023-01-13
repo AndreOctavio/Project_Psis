@@ -79,6 +79,7 @@ void * keyboard_thread(void * arg){
     int key = -1;
     int n_bytes;
 
+    /* keyboard reading loop */
     while(key != 27 && key!= 'q'){
 
         key = wgetch(thread_args->my_win);
@@ -111,6 +112,18 @@ void * keyboard_thread(void * arg){
             *thread_args->game_state = in_game;
             pthread_mutex_unlock(thread_args->lock);
 
+            /* send reconnect message */
+            msg.msg_type = reconnect;
+
+            msg.player[msg.player_num] = *thread_args->player;
+
+            /* Send reconnect to server */
+            n_bytes = sendto(thread_args->socket_fd, &msg, sizeof(message_t), 0, (const struct sockaddr *) &thread_args->server_addr, sizeof(thread_args->server_addr));
+            if (n_bytes!= sizeof(message_t)){
+                perror("write");
+                exit(-1);
+            }
+
         /* if the game is over, close thread */
         } else if (*thread_args->game_state == game_over){
             break;
@@ -141,6 +154,8 @@ void * communication_thread(void * arg){
     message_t msg_send;
     player_info_t player_data[MAX_PLAYERS];
 
+    memcpy(player_data, thread_args->player_data, sizeof(player_data));
+
     /* Receiving loop */
     while(1){
         
@@ -151,12 +166,10 @@ void * communication_thread(void * arg){
             return 0;
         }
 
-        /* MESSAGE RECEIVED PROCESSING */
-
         /* Checks if message recv is field_status */
         if(msg.msg_type == field_status){
-            
-            /* If drawing this client's character, change color */
+
+            /* Set the right color */
             if(msg.new_status.ch == thread_args->player->ch){
                 color = 4;
             } else if (msg.new_status.ch == '*'){
@@ -168,6 +181,7 @@ void * communication_thread(void * arg){
             }
 
             pthread_mutex_lock(thread_args->lock);
+
             /* Draw the player in the game window */
             if(msg.old_status.ch != -1){
                 draw_player(thread_args->my_win, &msg.old_status, 0, color);
@@ -181,51 +195,17 @@ void * communication_thread(void * arg){
 
             /* update local array of the player data */
             player_data[msg.arr_position] = msg.new_status;
-
+            
             /* Print player HP in message window */
             show_all_health(thread_args->message_win, player_data);
 
             pthread_mutex_unlock(thread_args->lock);
 
 
-            
+        } 
 
-
-
-
-
-
-            // /* This section of code will draw the field status and update the windows */
-            // clear_screen(thread_args->my_win);
-
-            // /* Draw all the players, bots and prizes */
-            // for(int i = 0; i < 10; i++){
-
-            //     /* If the player is in the game, draw it */
-            //     if(thread_args->msg.player[i].ch != -1){
-
-            //         /* If drawing this client's character, change color */
-            //         if(thread_args->msg.player[i].ch == thread_args->character){
-            //             draw_player(thread_args->my_win, &thread_args->msg.player[i], 1, 4);
-            //         } else {
-            //             /* Draw all the players */
-            //             draw_player(thread_args->my_win, &thread_args->msg.player[i], 1, 1);
-            //         }
-            //     }
-            //     /* If the bot is in the game, draw it */
-            //     if (thread_args->msg.bots[i].ch != -1){
-            //         /* Draw all the bots */
-            //         draw_player(thread_args->my_win, &thread_args->msg.bots[i], 1, 2);
-            //     }
-            //     /* If the prize is in the game, draw it */
-            //     if (thread_args->msg.prizes[i].ch != -1){
-            //         /* Draw all the bots */
-            //         draw_player(thread_args->my_win, &thread_args->msg.prizes[i], 1, 3);
-            //     }
-            // }
-
-        /* If the message received is health_0 start the countdown */
-        } else if (msg.msg_type == health_0){
+        /* If the message received is health_0 inform client */
+        else if (msg.msg_type == health_0){
 
             /* Print text in message window */
             mvwprintw(thread_args->message_win, 1, 1, "                  ");
@@ -244,58 +224,58 @@ void * communication_thread(void * arg){
             *thread_args->game_state = countdown;
             pthread_mutex_unlock(thread_args->lock);
 
-            /* countdown */
-            for(int i = 9; (i > 0); i--){
+            // /* countdown */
+            // for(int i = 9; (i > 0); i--){
 
-                /* Checks if the keyboard thread has changed the state of the game
-                 * If the keyboard thread has detected an input it will change the game_state to in_game */
-                pthread_mutex_lock(thread_args->lock);
-                if(*thread_args->game_state != countdown){
-                    pthread_mutex_unlock(thread_args->lock);
-                    break;
-                }
-                pthread_mutex_unlock(thread_args->lock);
+            //     /* Checks if the keyboard thread has changed the state of the game
+            //      * If the keyboard thread has detected an input it will change the game_state to in_game */
+            //     pthread_mutex_lock(thread_args->lock);
+            //     if(*thread_args->game_state != countdown){
+            //         pthread_mutex_unlock(thread_args->lock);
+            //         break;
+            //     }
+            //     pthread_mutex_unlock(thread_args->lock);
 
-                mvwprintw(thread_args->message_win, 4, 1, "                  ");
-                mvwprintw(thread_args->message_win, 4, 1, " %d seconds        ", i);
-                wrefresh(thread_args->message_win);
-                sleep(1);
-            }
+            //     mvwprintw(thread_args->message_win, 4, 1, "                  ");
+            //     mvwprintw(thread_args->message_win, 4, 1, " %d seconds        ", i);
+            //     wrefresh(thread_args->message_win);
+            //     sleep(1);
+            // }
 
-            /* If the game_state is still countdown, it means that the countdown has ended
-             * was not interrupted and the game is over */
-            pthread_mutex_lock(thread_args->lock);
-            if(*thread_args->game_state == countdown){
+            // /* If the game_state is still countdown, it means that the countdown has ended
+            //  * was not interrupted and the game is over */
+            // pthread_mutex_lock(thread_args->lock);
+            // if(*thread_args->game_state == countdown){
 
-                /* Set game_state to game_over such that the keyboard thread 
-                 * knows how to handle keyboard input */
-                *thread_args->game_state = game_over;
-                pthread_mutex_unlock(thread_args->lock);
+            //     /* Set game_state to game_over such that the keyboard thread 
+            //      * knows how to handle keyboard input */
+            //     *thread_args->game_state = game_over;
+            //     pthread_mutex_unlock(thread_args->lock);
 
-                mvwprintw(thread_args->message_win, 3, 1, "                  ");
-                mvwprintw(thread_args->message_win, 3, 1, " exit.            ");
-                mvwprintw(thread_args->message_win, 4, 1, "                  ");
-                mvwprintw(thread_args->message_win, 5, 1, " See you soon!    ");
-                wrefresh(thread_args->message_win);
-                sleep(1);
+            //     mvwprintw(thread_args->message_win, 3, 1, "                  ");
+            //     mvwprintw(thread_args->message_win, 3, 1, " exit.            ");
+            //     mvwprintw(thread_args->message_win, 4, 1, "                  ");
+            //     mvwprintw(thread_args->message_win, 5, 1, " See you soon!    ");
+            //     wrefresh(thread_args->message_win);
+            //     sleep(1);
 
-                break;
+            //     break;
 
-            /* If the game_state is in_game, it means that the keyboard thread has detected
-             * an input and the game is still going on */
-            } else if (*thread_args->game_state == in_game) {
+            // /* If the game_state is in_game, it means that the keyboard thread has detected
+            //  * an input and the game is still going on */
+            // } else if (*thread_args->game_state == in_game) {
 
-                pthread_mutex_unlock(thread_args->lock);
+            //     pthread_mutex_unlock(thread_args->lock);
                 
-                /* send reconnect message to server */
-                msg_send.msg_type = reconnect;
-                send(thread_args->socket_fd, &msg_send, sizeof(message_t), 0);
+            //     /* send reconnect message to server */
+            //     msg_send.msg_type = reconnect;
+            //     send(thread_args->socket_fd, &msg_send, sizeof(message_t), 0);
 
-                // /* Print player HP in message window */
-                // show_all_health(thread_args->message_win, thread_args->msg.player);
-                continue;
-            }
-            pthread_mutex_unlock(thread_args->lock);
+            //     // /* Print player HP in message window */
+            //     // show_all_health(thread_args->message_win, thread_args->msg.player);
+            //     continue;
+            // }
+            // pthread_mutex_unlock(thread_args->lock);
 
         }
     }
@@ -469,6 +449,8 @@ int main(int argc, char *argv[]){
         }
     }
 
+    show_all_health(message_win, msg.player);
+
     wrefresh(my_win);    // refresh the screen
 
 
@@ -484,11 +466,7 @@ int main(int argc, char *argv[]){
     args_thread.server_addr = server_addr;
     args_thread.player = &player;
     args_thread.player_id = msg.player_num;
-
-    //printf ("player_id: %d\n", args_thread.player_id);
-    fflush(stdout);
-
-    sleep(3);
+    memcpy(args_thread.player_data, msg.player, sizeof(args_thread.player_data));
 
     args_thread.game_state = &game_state;
     args_thread.lock = &lock;

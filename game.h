@@ -25,7 +25,7 @@ typedef enum msg_type_t {connection, ball_information, ball_movement, field_stat
 typedef enum direction_t {UP, DOWN, LEFT, RIGHT} direction_t;
 typedef enum game_state_t {in_game, countdown, game_over} game_state_t;
 
-/*Structure to store player's information*/
+/* Structure to store player's information*/
 typedef struct player_info_t 
 {   
     char ch;
@@ -34,6 +34,7 @@ typedef struct player_info_t
 
 } player_info_t;
 
+/* main message structure */
 typedef struct message_t
 {   
     msg_type_t msg_type;
@@ -44,6 +45,7 @@ typedef struct message_t
     int direction;
 } message_t;
 
+/* struct to store changes in the field to send as field_status */
 typedef struct msg_field_update
 {
     msg_type_t msg_type;
@@ -53,6 +55,7 @@ typedef struct msg_field_update
 
 } msg_field_update;
 
+/* client arguments to pass to threads */
 typedef struct thread_args_t
 {
     WINDOW * my_win;
@@ -60,12 +63,14 @@ typedef struct thread_args_t
     struct sockaddr_in server_addr;
     int socket_fd;
     int player_id;
+    player_info_t player_data[MAX_PLAYERS];
     player_info_t * player;
     game_state_t * game_state;
     pthread_mutex_t * lock;
 
 } thread_args_t;
 
+/* server arguments to pass to threads */
 typedef struct server_args_t
 {
     WINDOW * my_win;
@@ -89,5 +94,12 @@ typedef struct server_args_t
 
     pthread_mutex_t lock;
 } server_args_t;
+
+/* arguments for countdown thread */
+typedef struct countdown_args_t
+{
+    int socket_fd;
+    pthread_mutex_t * lock;
+} countdown_args_t;
 
 void show_all_health(WINDOW * message_win, player_info_t player_data[10]);
