@@ -183,6 +183,7 @@ void send_all_field_status(msg_field_update * msg, int socket[MAX_PLAYERS], play
 
 }
 
+
 void * countdown_loop(void * arg) {
 
     countdown_thread_t * args = (countdown_thread_t *) arg;
@@ -510,6 +511,7 @@ void * player_loop(void * arg){
     msg_field_update msg_update;
 
     countdown_thread_t args_countdown;
+    player_info_t tmp_player;
 
     while (1) {
 
@@ -522,6 +524,8 @@ void * player_loop(void * arg){
             if(n_bytes == 0) { // Client closed the socket
                 
                 pthread_mutex_lock(&player->lock);
+
+                tmp_player = player->player_data[self];
 
                 /* Take the player out of the game */
                 player->player_data[self].ch = -1;
@@ -538,6 +542,13 @@ void * player_loop(void * arg){
                 show_all_health(player->message_win, player->player_data);
 
                 pthread_mutex_unlock(&player->lock);
+
+                /* send field_status update to everyone */
+                msg_update.old_status = tmp_player;
+                msg_update.new_status.ch = -1;
+                msg_update.msg_type = field_status;
+                msg_update.arr_position = self;
+                send_all_field_status(&msg_update, player->con_socket, player->player_data, player->n_bots);
 
                 return 0;
             }

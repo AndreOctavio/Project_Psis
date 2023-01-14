@@ -46,7 +46,8 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[MAX_PLAYERS
     }
 
     /* Print health of first 10 players */
-    for (i = 0; i < 10; i++){
+    for (i = 0; i < MAX_PLAYERS; i++){
+
         if (player_data[i].ch != -1){
             if(player_data[i].hp == 0){
                 mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c->Dead", player_data[i].ch);
@@ -54,6 +55,11 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[MAX_PLAYERS
                 mvwprintw(message_win, j % 5 + 1, j / 5 * 11 + 1, "%c-> %d ", player_data[i].ch, player_data[i].hp);
             }
             j++;
+        }
+
+        /* only print health of first 10 players in the array */
+        if (j == 10){
+            break;
         }
     }
     
@@ -80,9 +86,13 @@ void * keyboard_thread(void * arg){
     int n_bytes;
 
     /* keyboard reading loop */
-    while(key != 27 && key!= 'q'){
+    while(key!= 'q'){
 
         key = wgetch(thread_args->my_win);
+
+        if(key == 27){
+            continue;
+        }
 
         /* Checks if the ball is in game or in some other state */
         if(*thread_args->game_state == in_game){
@@ -415,10 +425,7 @@ int main(int argc, char *argv[]){
     box(message_win, 0 , 0);
     wrefresh(message_win);
 
-
-    /* Draw all the players, bots and prizes */
-    for(int i = 0; i < 10; i++){
-
+    for(int i = 0; i < MAX_PLAYERS; i++){
         /* If the player is in the game, draw it */
         if(msg.player[i].ch != -1){
 
@@ -430,6 +437,11 @@ int main(int argc, char *argv[]){
                 draw_player(my_win, &msg.player[i], 1, 1);
             }
         }
+    }
+
+    /* Draw all the players, bots and prizes */
+    for(int i = 0; i < 10; i++){
+
         /* If the bot is in the game, draw it */
         if (msg.bots[i].ch != -1){
             /* Draw all the bots */
