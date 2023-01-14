@@ -1,22 +1,5 @@
 #include "../game.h"
 
-/* countdown() :
- * Function for thread that counts 10 seconds
- * and then closes the socket if not interrupted
- */
-void * countdown_thread(void * arg){
-
-    countdown_args_t * args = (countdown_args_t *) arg;
-
-    sleep(10);
-
-    pthread_mutex_lock(args->lock);
-    close(args->socket_fd);
-    pthread_mutex_unlock(args->lock);
-
-    return 0;
-}
-
 /* moove_player() : 
 * Function that generates a random 
 * direction; 
@@ -182,7 +165,7 @@ void show_all_health(WINDOW * message_win, player_info_t player_data[MAX_PLAYERS
  * Function that sends the status of the field
  * to all connected players;
  */
-void send_all_field_status(msg_field_update * msg, int socket[10], player_info_t players[MAX_PLAYERS], int n_bots){
+void send_all_field_status(msg_field_update * msg, int socket[MAX_PLAYERS], player_info_t players[MAX_PLAYERS], int n_bots){
 
     int n_bytes;
 
@@ -200,6 +183,39 @@ void send_all_field_status(msg_field_update * msg, int socket[10], player_info_t
 
 }
 
+void * countdown_loop(void * arg) {
+
+    countdown_thread_t * args = (countdown_thread_t *) arg;
+
+    msg_field_update countdown_msg;
+
+    sleep(10);
+    
+    player_info_t tmp_player = args->players[args->self];
+
+    /* Take the player out of the game */
+    args->players[args->self].ch = -1;
+    args->n_players--;
+    *args->free_space = 1;
+
+    close(args->all_sockets[args->self]);
+
+    wmove(args->my_win, args->players[args->self].pos_y, args->players[args->self].pos_x);
+    waddch(args->my_win, ' ');
+    wrefresh(args->my_win);
+
+    pthread_cancel(args->server_thread);
+
+    /* send field_status update to everyone */
+    countdown_msg.old_status = tmp_player;
+    countdown_msg.new_status.ch = -1;
+    countdown_msg.msg_type = field_status;
+    countdown_msg.arr_position = args->self;
+    send_all_field_status(&countdown_msg, args->all_sockets, args->players, args->n_bots);
+
+    return 0;
+}
+
 /* bot_loop() : 
 * Function for a thread to work on.
 * It takes care of everything that has to
@@ -209,15 +225,13 @@ void * bot_loop(void * arg){
 
     server_args_t * bot = (server_args_t *) arg;
 
-    pthread_t thread_id[MAX_PLAYERS];
-    countdown_args_t countdown_args[MAX_PLAYERS];
-
     int pos_x, pos_y, n_bytes, i, clear_to_move = 1;
 
-    message_t msg_ta_mal;
     msg_field_update msg_update;
 
     msg_field_update msg;
+
+    countdown_thread_t args_countdown;
 
     /* Spawn the number of bots given in player_num */
     for (i = 0; i < bot->n_bots; i++) {
@@ -302,11 +316,19 @@ void * bot_loop(void * arg){
                                 exit(-1);
                             }
 
-                            /* create the countdown thread which will close the dead player's socket 
-                             * if no reconnect message is received */
-                            countdown_args->lock = &bot->lock;
-                            countdown_args->socket_fd = bot->con_socket[j];
-                            pthread_create(&thread_id[j], NULL, &countdown_thread, (void *) countdown_args);
+                            args_countdown.self = j;
+                            args_countdown.server_thread = bot->thread_id[j];
+
+                            args_countdown.players = bot->player_data;
+                            args_countdown.free_space = &bot->free_space[bot->player_data[j].pos_y - 1][bot->player_data[j].pos_x - 1];
+
+                            args_countdown.n_players = &bot->n_players;
+                            args_countdown.my_win = bot->my_win;
+
+                            args_countdown.n_bots = bot->n_bots;
+                            args_countdown.all_sockets = bot->con_socket;
+
+                            pthread_create(&bot->thread_countdown_id[j], NULL, &countdown_loop, (void *) &args_countdown);
                         } 
 
                         clear_to_move = 0; // Can't move into new position
@@ -362,10 +384,9 @@ void * bot_loop(void * arg){
                 msg.new_status = bot->bot_data[i];
                 msg.msg_type = field_status;
                 msg.arr_position = -1;
-                send_all_field_status(&msg, bot->con_socket, bot->player_data, bot->n_bots);
 
             }
-
+            send_all_field_status(&msg, bot->con_socket, bot->player_data, bot->n_bots);
             clear_to_move = 1;
         }
 
@@ -471,7 +492,7 @@ void * prize_loop(void * arg){
         return NULL;
 }
 
-/* prize_loop() : 
+/* player_loop() : 
 * Function for a thread to work on.
 * It takes care of everything that has to
 * do with the clients in the game; 
@@ -479,14 +500,16 @@ void * prize_loop(void * arg){
 void * player_loop(void * arg){
 
     server_args_t * player = (server_args_t *) arg;
-    pthread_t thread_id[MAX_PLAYERS];
-    countdown_args_t countdown_args[MAX_PLAYERS];
 
     int self = player->tmp_self;
+    player->thread_id[self] = pthread_self();
+
     int pos_x, pos_y, n_bytes, clear_to_move = 1;
 
     message_t msg;
     msg_field_update msg_update;
+
+    countdown_thread_t args_countdown;
 
     while (1) {
 
@@ -504,6 +527,7 @@ void * player_loop(void * arg){
                 player->player_data[self].ch = -1;
                 player->n_players--;
                 player->free_space[player->player_data[self].pos_y - 1][player->player_data[self].pos_x - 1] = 1;
+
                 close(player->con_socket[self]);
 
                 wmove(player->my_win, player->player_data[self].pos_y, player->player_data[self].pos_x);
@@ -572,12 +596,12 @@ void * player_loop(void * arg){
 
         /* BALL_MOVEMENT MESSAGE */
         else if(msg.msg_type == ball_movement){
-
-            pthread_mutex_lock(&player->lock); 
         
             /* Check if the client sending the message is in fact
             a player in the game (anti-cheat) */
             if (player->player_data[msg.player_num].ch == msg.player[msg.player_num].ch) { 
+
+                pthread_mutex_lock(&player->lock);
 
                 /* Save the current position of the player */
                 msg_update.old_status = player->player_data[self];
@@ -599,6 +623,7 @@ void * player_loop(void * arg){
 
                             /*If the player that was hit has 0 lives then its GAME OVER */
                             if (player->player_data[j].hp == 0) {
+    
                                 clear_to_move = 0;
                                 break;
                             }
@@ -608,7 +633,7 @@ void * player_loop(void * arg){
                                 player->player_data [self].hp++;
                             }
 
-                            player->player_data[j].hp--; // Decrease HP of the player that was hit
+                            player->player_data [j].hp--; // Decrease HP of the player that was hit
 
                             /* send field_status update to everyone */
                             msg_update.old_status.ch = -1;
@@ -629,12 +654,19 @@ void * player_loop(void * arg){
                                     exit(-1);
                                 }
 
-                                /* create the countdown thread which will close the dead player's socket 
-                                 * if no reconnect message is received */
-                                countdown_args->lock = &player->lock;
-                                countdown_args->socket_fd = player->con_socket[j];
-                                pthread_create(&thread_id[msg.player_num], NULL, &countdown_thread, (void *) countdown_args);
+                                args_countdown.self = j;
+                                args_countdown.server_thread = player->thread_id[j];
 
+                                args_countdown.players = player->player_data;
+                                args_countdown.free_space = &player->free_space[player->player_data[j].pos_y - 1][player->player_data[j].pos_x - 1];
+
+                                args_countdown.n_players = &player->n_players;
+                                args_countdown.my_win = player->my_win;
+
+                                args_countdown.n_bots = player->n_bots;
+                                args_countdown.all_sockets = player->con_socket;
+
+                                pthread_create(&player->thread_countdown_id[j], NULL, &countdown_loop, (void *) &args_countdown);
                             } 
 
                             clear_to_move = 0; // Can't move into new position
@@ -719,8 +751,7 @@ void * player_loop(void * arg){
         /* Reconnect msg handling */
         else if (msg.msg_type == reconnect) {
 
-            /* terminate countdown thread */
-            pthread_cancel(thread_id[msg.player_num]);
+            pthread_cancel(player->thread_countdown_id[self]);
 
             pthread_mutex_lock(&player->lock);
 

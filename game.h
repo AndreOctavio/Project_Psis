@@ -70,7 +70,23 @@ typedef struct thread_args_t
 
 } thread_args_t;
 
-/* server arguments to pass to threads */
+typedef struct countdown_thread_t
+{   
+    WINDOW * my_win;
+
+    int self;
+    int n_bots;
+
+    player_info_t * players;
+    int * all_sockets;
+
+    int * n_players;
+    int * free_space;
+
+    pthread_t server_thread;
+
+} countdown_thread_t;
+
 typedef struct server_args_t
 {
     WINDOW * my_win;
@@ -92,14 +108,9 @@ typedef struct server_args_t
 
     int tmp_self;
 
+    pthread_t thread_id [MAX_PLAYERS];
+    pthread_t thread_countdown_id [MAX_PLAYERS];
+
     pthread_mutex_t lock;
+
 } server_args_t;
-
-/* arguments for countdown thread */
-typedef struct countdown_args_t
-{
-    int socket_fd;
-    pthread_mutex_t * lock;
-} countdown_args_t;
-
-void show_all_health(WINDOW * message_win, player_info_t player_data[10]);
