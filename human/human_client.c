@@ -127,6 +127,14 @@ void * keyboard_thread(void * arg){
     /* close tcp socket */
     close(thread_args->socket_fd);
 
+    if (key == 'q') {
+        /* close ncurses */
+        endwin();
+
+        printf("Disconnected\n");
+        exit(0);
+    }
+
     return 0;
 
 }
