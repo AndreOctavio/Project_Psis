@@ -60,6 +60,7 @@ void moove_player (int *pos_x, int *pos_y, int direction){
 */
 int find_empty (int * x, int * y, int n_players, int free [][WINDOW_SIZE - 2]) {
 
+    /* If theres less than 30 players we use the random position generator*/
     if (n_players < 30) {
 
         int found = 0;
@@ -74,19 +75,20 @@ int find_empty (int * x, int * y, int n_players, int free [][WINDOW_SIZE - 2]) {
             *x = (rand() % 18) + 1;
             *y = (rand() % 18) + 1;
 
-            if (free [*y - 1][*x - 1] == 1) {
-                free [*y - 1][*x - 1] = 0;
+            if (free [*y - 1][*x - 1] == 1) { // The position is free
+                free [*y - 1][*x - 1] = 0; // Change to not free
                 return 1;
             }
         }
     } 
     
+    /* If not we use the first avaiable position*/
     else {
 
         for (int i = 0; i < WINDOW_SIZE - 2; i++) {
             for (int j = 0; j < WINDOW_SIZE - 2; j++) {
-                if (free [i][j] == 1) {
-                    free [i][j] = 0;
+                if (free [i][j] == 1) { // The position is free
+                    free [i][j] = 0; // Change to not free
                     *x = j + 1;
                     *y = i + 1;
 
@@ -184,26 +186,34 @@ void send_all_field_status(msg_field_update * msg, int socket[MAX_PLAYERS], play
 
 }
 
-
+/* countdown_loop() :
+* Function for a thread to work on.
+* It takes care of everything that has to
+* do with the 10 second countdown;
+*/
 void * countdown_loop(void * arg) {
 
     countdown_thread_t * args = (countdown_thread_t *) arg;
 
     msg_field_update countdown_msg;
 
-    sleep(10);
+    sleep(10); // Sleep for 10 seconds
     
-    player_info_t tmp_player = args->players[args->self];
+    player_info_t tmp_player = args->players[args->self]; // Keep the old player for the field status update
 
     pthread_mutex_lock(args->lock_player);
+
     /* Take the player out of the game */
     args->players[args->self].ch = -1;
     args->n_players--;
+
+    /* Close the TCP socket */
     close(args->all_sockets[args->self]);
+
     pthread_mutex_unlock(args->lock_player);
 
     pthread_mutex_lock(args->lock_free);
-    *args->free_space = 1;
+    *args->free_space = 1; // Space becomes free
     pthread_mutex_unlock(args->lock_free);
 
     pthread_mutex_lock(args->lock_window);
@@ -331,6 +341,7 @@ void * bot_loop(void * arg){
                                 exit(-1);
                             }
 
+                            /* Prepare the arguments for the countdown thread */
                             args_countdown[j].self = j;
                             args_countdown[j].server_thread = bot->thread_id[j];
 
@@ -354,6 +365,7 @@ void * bot_loop(void * arg){
                             pthread_mutex_unlock(&bot->lock_player);
                             pthread_mutex_unlock(&bot->lock_prize);
 
+                            /* Launch the countdown thread */
                             pthread_create(&bot->thread_countdown_id[j], NULL, &countdown_loop, (void *) &args_countdown[j]);
                                         
                             pthread_mutex_lock(&bot->lock_bot);
@@ -441,10 +453,10 @@ void * bot_loop(void * arg){
         }
         pthread_mutex_unlock(&bot->lock_bot);
 
-        /* Update the message window */
         pthread_mutex_lock(&bot->lock_player);
         pthread_mutex_lock(&bot->lock_window);
 
+        /* Update the message window */
         show_all_health(bot->message_win, bot->player_data);
 
         pthread_mutex_unlock(&bot->lock_window);
@@ -742,6 +754,7 @@ void * player_loop(void * arg){
                                     exit(-1);
                                 }
 
+                                /* Prepare the arguments for the countdown thread */
                                 args_countdown[j].self = j;
                                 args_countdown[j].server_thread = player->thread_id[j];
 
@@ -762,6 +775,7 @@ void * player_loop(void * arg){
 
                                 pthread_mutex_unlock(&player->lock_player);
 
+                                /* Launch the countdown thread */
                                 pthread_create(&player->thread_countdown_id[j], NULL, &countdown_loop, (void *) &args_countdown[j]);
 
                                 pthread_mutex_lock(&player->lock_player);
@@ -888,6 +902,7 @@ int main(int argc, char *argv[])
 
     server_args_t serv_arg;
 
+    /* Get the port */
     port = atoi(argv[1]);
 
     if (port < 1023 || port > 65353) {
@@ -895,6 +910,7 @@ int main(int argc, char *argv[])
 	    exit(-1);
     }
 
+    /* Get the number of bots */
     serv_arg.n_bots = atoi(argv[2]);
 
     if (serv_arg.n_bots < 1 || serv_arg.n_bots > 10) {
@@ -1026,13 +1042,8 @@ int main(int argc, char *argv[])
         n_prizes_copy = serv_arg.n_prizes;
         pthread_mutex_unlock(&serv_arg.lock_prize);
 
-    
-        /* check if accept returned errors */
-        if (new_con == -1) {
-            perror("Accept error..");
-        } 
         /* check if field is full */
-        else if (n_players_copy < players_max - n_prizes_copy) { 
+        if (n_players_copy < players_max - n_prizes_copy) { 
 
             pthread_mutex_lock(&serv_arg.lock_player);
             for (i = 0; i < players_max; i++) {
