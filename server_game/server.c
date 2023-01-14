@@ -1,6 +1,6 @@
 #include "../game.h"
 
-/* moove_player() : 
+/* generate_direction() : 
 * Function that generates a random 
 * direction; 
 */
@@ -27,7 +27,7 @@ int generate_direction(){
 * Function that updates the coordenates of 
 * a player with a given direction; 
 */
-void moove_player (int *pos_x, int *pos_y, int direction, WINDOW * msg_win){
+void moove_player (int *pos_x, int *pos_y, int direction){
 
     if (direction == KEY_UP){
         if (*pos_y != 1){
@@ -103,7 +103,7 @@ int find_empty (int * x, int * y, int n_players, int free [][WINDOW_SIZE - 2]) {
 * Function that checks if a character is already 
 * being used, if it is assigns one that isn't;
 */
-char ch_checker (char character, player_info_t players[10]) {
+char ch_checker (char character, player_info_t players[MAX_PLAYERS]) {
 
     int eureka = 0, lowercase;
 
@@ -112,7 +112,7 @@ char ch_checker (char character, player_info_t players[10]) {
 
         eureka = 1;
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
             if (character == players[i].ch) {
                 eureka = 0;
 
@@ -126,6 +126,7 @@ char ch_checker (char character, player_info_t players[10]) {
                 break;
             }
         }
+
     }
 
     return character;
@@ -194,16 +195,22 @@ void * countdown_loop(void * arg) {
     
     player_info_t tmp_player = args->players[args->self];
 
+    pthread_mutex_lock(args->lock_player);
     /* Take the player out of the game */
     args->players[args->self].ch = -1;
     args->n_players--;
-    *args->free_space = 1;
-
     close(args->all_sockets[args->self]);
+    pthread_mutex_unlock(args->lock_player);
 
+    pthread_mutex_lock(args->lock_free);
+    *args->free_space = 1;
+    pthread_mutex_unlock(args->lock_free);
+
+    pthread_mutex_lock(args->lock_window);
     wmove(args->my_win, args->players[args->self].pos_y, args->players[args->self].pos_x);
     waddch(args->my_win, ' ');
     wrefresh(args->my_win);
+    pthread_mutex_unlock(args->lock_window);
 
     pthread_cancel(args->server_thread);
 
@@ -212,7 +219,10 @@ void * countdown_loop(void * arg) {
     countdown_msg.new_status.ch = -1;
     countdown_msg.msg_type = field_status;
     countdown_msg.arr_position = args->self;
+
+    pthread_mutex_lock(args->lock_player);
     send_all_field_status(&countdown_msg, args->all_sockets, args->players, args->n_bots);
+    pthread_mutex_unlock(args->lock_player);
 
     return 0;
 }
@@ -232,35 +242,38 @@ void * bot_loop(void * arg){
 
     msg_field_update msg;
 
-    countdown_thread_t args_countdown;
+    countdown_thread_t args_countdown[MAX_PLAYERS];
 
-    /* Spawn the number of bots given in player_num */
+    /* Spawn the number of bots given in terminal arguments */
     for (i = 0; i < bot->n_bots; i++) {
         
-        pthread_mutex_lock(&bot->lock);
-
         /* Find an empty space for a bot to spawn */
+        pthread_mutex_lock(&bot->lock_free);
         find_empty (&pos_x, &pos_y, 0, bot->free_space); // Find an empty space to spawn the bot
+        pthread_mutex_unlock(&bot->lock_free);
 
         /* Save the bot data */
+        pthread_mutex_lock(&bot->lock_bot);
         bot->bot_data[i].ch = '*';
         bot->bot_data[i].pos_x = pos_x;
         bot->bot_data[i].pos_y = pos_y;
+        pthread_mutex_unlock(&bot->lock_bot);
 
         /* Draw bot */
+        pthread_mutex_lock(&bot->lock_window);
         wmove(bot->my_win, pos_y, pos_x);
         waddch(bot->my_win, '*');
         wrefresh(bot->my_win);
+        pthread_mutex_unlock(&bot->lock_window);
 
         /* Send the change to all the clients */
         msg.old_status.ch = -1;
         msg.new_status = bot->bot_data[i];
         msg.msg_type = field_status;
         msg.arr_position = -1;
+        pthread_mutex_lock(&bot->lock_player);
         send_all_field_status(&msg, bot->con_socket, bot->player_data, bot->n_bots);
-
-        pthread_mutex_unlock(&bot->lock);
-
+        pthread_mutex_unlock(&bot->lock_player);
     }
 
     /* Loop that makes the bots move */
@@ -268,9 +281,8 @@ void * bot_loop(void * arg){
 
         sleep(3);
 
-        pthread_mutex_lock(&bot->lock);
-
-
+        /* Loop to make all the bots move */
+        pthread_mutex_lock(&bot->lock_bot);
         for (i = 0; i < bot->n_bots; i++) {
 
             msg.old_status = bot->bot_data[i];
@@ -280,13 +292,14 @@ void * bot_loop(void * arg){
             pos_y = bot->bot_data[i].pos_y;
 
             /* Calculate the new position */
-            moove_player(&pos_x, &pos_y, generate_direction(), bot->message_win);
+            moove_player(&pos_x, &pos_y, generate_direction());
 
             /* Check if the bot hit something */
             for(int j = 0 ; j < (MAX_PLAYERS) - bot->n_bots; j++){
 
-                /* Check if the position in the array has a player */
-                if((bot->player_data[j].ch != -1) && (j != i)) {
+                /* Check if bot hit a player */
+                pthread_mutex_lock(&bot->lock_player);
+                if(bot->player_data[j].ch != -1) {
                     
                     /* See if the player is in the position that the bot is moving into */
                     if (bot->player_data[j].pos_x == pos_x && bot->player_data[j].pos_y == pos_y){ //Bot hits another player
@@ -294,17 +307,18 @@ void * bot_loop(void * arg){
                         if (bot->player_data[j].hp == 0) { // If the player has health 0 it means the server is waiting for a
                                                            // signal for him to respawn. The bot can't move into this position.
                                 clear_to_move = 0;
+                                pthread_mutex_unlock(&bot->lock_player);
                                 break;
                         }
 
                         bot->player_data[j].hp--; // Decrease HP of the player that was hit
 
-                            /* send field_status update to everyone */
-                            msg_update.old_status.ch = -1;
-                            msg_update.new_status = bot->player_data[j];
-                            msg_update.msg_type = field_status;
-                            msg_update.arr_position = j;
-                            send_all_field_status(&msg_update, bot->con_socket, bot->player_data, bot->n_bots);
+                        /* send field_status update to everyone */
+                        msg_update.old_status.ch = -1;
+                        msg_update.new_status = bot->player_data[j];
+                        msg_update.msg_type = field_status;
+                        msg_update.arr_position = j;
+                        send_all_field_status(&msg_update, bot->con_socket, bot->player_data, bot->n_bots);
 
                         if (bot->player_data[j].hp == 0) { // If the player that was hit now has 0 lives then its countdown time
 
@@ -317,49 +331,73 @@ void * bot_loop(void * arg){
                                 exit(-1);
                             }
 
-                            args_countdown.self = j;
-                            args_countdown.server_thread = bot->thread_id[j];
+                            args_countdown[j].self = j;
+                            args_countdown[j].server_thread = bot->thread_id[j];
 
-                            args_countdown.players = bot->player_data;
-                            args_countdown.free_space = &bot->free_space[bot->player_data[j].pos_y - 1][bot->player_data[j].pos_x - 1];
+                            pthread_mutex_lock(&bot->lock_free);
+                            args_countdown[j].players = bot->player_data;
+                            args_countdown[j].free_space = &bot->free_space[bot->player_data[j].pos_y - 1][bot->player_data[j].pos_x - 1];
+                            args_countdown[j].lock_free = &bot->lock_free;
+                            pthread_mutex_unlock(&bot->lock_free);
 
-                            args_countdown.n_players = &bot->n_players;
-                            args_countdown.my_win = bot->my_win;
+                            args_countdown[j].n_players = &bot->n_players;
+                            args_countdown[j].my_win = bot->my_win;
 
-                            args_countdown.n_bots = bot->n_bots;
-                            args_countdown.all_sockets = bot->con_socket;
+                            args_countdown[j].n_bots = bot->n_bots;
+                            args_countdown[j].all_sockets = bot->con_socket;
 
-                            pthread_create(&bot->thread_countdown_id[j], NULL, &countdown_loop, (void *) &args_countdown);
+                            args_countdown[j].lock_free = &bot->lock_free;
+                            args_countdown[j].lock_player = &bot->lock_player;
+                            args_countdown[j].lock_window = &bot->lock_bot;
+
+                            pthread_mutex_unlock(&bot->lock_bot);
+                            pthread_mutex_unlock(&bot->lock_player);
+                            pthread_mutex_unlock(&bot->lock_prize);
+
+                            pthread_create(&bot->thread_countdown_id[j], NULL, &countdown_loop, (void *) &args_countdown[j]);
+                                        
+                            pthread_mutex_lock(&bot->lock_bot);
+                            pthread_mutex_lock(&bot->lock_player);
+                            pthread_mutex_lock(&bot->lock_prize);
+                        
                         } 
 
                         clear_to_move = 0; // Can't move into new position
-
+                        
+                        pthread_mutex_unlock(&bot->lock_player);
                         break;
                     }
                 }
+                pthread_mutex_unlock(&bot->lock_player);
 
-                /* Check if bot hit another bot */
-                if ((bot->bot_data[j].ch != -1) && (j != i) && (j < 10)) {
+                if (j < 10){
 
-                    /* Bot hits a bot */
-                    if (bot->bot_data[j].pos_x == pos_x && bot->bot_data[j].pos_y == pos_y){
+                    /* Check if bot hit a bot */
+                    if ((bot->bot_data[j].ch != -1) && (j != i)) {
 
-                        clear_to_move = 0; // Can't move into new position
-                        break;
-                    } 
+                        /* Bot hits a bot */
+                        if (bot->bot_data[j].pos_x == pos_x && bot->bot_data[j].pos_y == pos_y){
 
-                }
-                
-                /* Check if bot hit a prize */
-                if ((bot->prize_data[j].ch != -1) && (j < 10)){
+                            clear_to_move = 0; // Can't move into new position
+                            break;
+                        } 
 
-                    /* Bot hits a prize */
-                    if ((bot->prize_data[j].pos_x == pos_x) && (bot->prize_data[j].pos_y == pos_y)){
-                        
-                        clear_to_move = 0; // Can't move into new position
-                        break;
-                    } 
+                    }
+                    
+                    /* Check if bot hit a prize */
+                    pthread_mutex_lock(&bot->lock_prize);
+                    if ((bot->prize_data[j].ch != -1)){
 
+                        /* Bot hits a prize */
+                        if ((bot->prize_data[j].pos_x == pos_x) && (bot->prize_data[j].pos_y == pos_y)){
+                            
+                            clear_to_move = 0; // Can't move into new position
+                            pthread_mutex_unlock(&bot->lock_prize);
+                            break;
+                        } 
+
+                    }
+                    pthread_mutex_unlock(&bot->lock_prize);
                 }
             }
 
@@ -367,34 +405,50 @@ void * bot_loop(void * arg){
             if (clear_to_move) {
 
                 /* Delete bot from old position */
+                pthread_mutex_lock(&bot->lock_window);
                 wmove(bot->my_win, bot->bot_data[i].pos_y, bot->bot_data[i].pos_x);
                 waddch(bot->my_win,' ');
+                pthread_mutex_unlock(&bot->lock_window);
 
                 /* Update the bot_data */
+                pthread_mutex_lock(&bot->lock_free);
                 bot->free_space[bot->bot_data[i].pos_y - 1][bot->bot_data[i].pos_x - 1] = 1;
                 bot->free_space[pos_y - 1][pos_x - 1] = 0;
+                pthread_mutex_unlock(&bot->lock_free);
+
                 bot->bot_data[i].pos_x = pos_x;
                 bot->bot_data[i].pos_y = pos_y;
 
                 /* Draw bot in the new position */
+                pthread_mutex_lock(&bot->lock_window);
                 wmove(bot->my_win, pos_y, pos_x);
                 waddch(bot->my_win, '*');
                 wrefresh(bot->my_win);	
+                pthread_mutex_unlock(&bot->lock_window);
 
                 /* Send the change to all the players in the game */
                 msg.new_status = bot->bot_data[i];
                 msg.msg_type = field_status;
                 msg.arr_position = -1;
 
+                pthread_mutex_lock(&bot->lock_player);
+                send_all_field_status(&msg, bot->con_socket, bot->player_data, bot->n_bots);
+                pthread_mutex_unlock(&bot->lock_player);
             }
-            send_all_field_status(&msg, bot->con_socket, bot->player_data, bot->n_bots);
+
+
             clear_to_move = 1;
         }
+        pthread_mutex_unlock(&bot->lock_bot);
 
         /* Update the message window */
+        pthread_mutex_lock(&bot->lock_player);
+        pthread_mutex_lock(&bot->lock_window);
+
         show_all_health(bot->message_win, bot->player_data);
 
-        pthread_mutex_unlock(&bot->lock);
+        pthread_mutex_unlock(&bot->lock_window);
+        pthread_mutex_unlock(&bot->lock_player);
     }
 }
 
@@ -407,22 +461,19 @@ void * prize_loop(void * arg){
     
         server_args_t * prize = (server_args_t *) arg;
         msg_field_update msg;
-
-        /* podemos meter tudo num array de prizes só
-            tipo player_info_t prize_data[10]
-            dps só enviar o field status */
     
         int pos_x, pos_y, i;
     
         /* Spawn the number of prizes given in player_num */
+        pthread_mutex_lock(&prize->lock_prize);
         for (i = 0; i < 5; i++) {
 
             srand(clock());
-            
-            pthread_mutex_lock(&prize->lock);
 
             /* Find an empty space for a player to spawn */
+            pthread_mutex_lock(&prize->lock_free);
             find_empty(&pos_x, &pos_y, 0, prize->free_space); // Find an empty space to spawn the prize
+            pthread_mutex_unlock(&prize->lock_free);
     
             /* Save the prize data */
             prize->prize_data[i].hp = (rand() % 5) + 1;
@@ -432,20 +483,23 @@ void * prize_loop(void * arg){
             prize->n_prizes++;
     
             /* Draw prize */
+            pthread_mutex_lock(&prize->lock_window);
             wmove(prize->my_win, pos_y, pos_x);
             waddch(prize->my_win, prize->prize_data[i].ch);
             wrefresh(prize->my_win);
+            pthread_mutex_unlock(&prize->lock_window);
 
             /* Send the change to all the players in the game */
             msg.old_status.ch = -1;
             msg.new_status = prize->prize_data[i];
             msg.msg_type = field_status;
             msg.arr_position = -1;
-            send_all_field_status(&msg, prize->con_socket, prize->player_data, prize->n_bots);
 
-            pthread_mutex_unlock(&prize->lock);
-    
+            pthread_mutex_lock(&prize->lock_player);
+            send_all_field_status(&msg, prize->con_socket, prize->player_data, prize->n_bots);
+            pthread_mutex_unlock(&prize->lock_player);
         }
+        pthread_mutex_unlock(&prize->lock_prize);
 
         /* Prize spawning loop */
         while(1) {
@@ -454,14 +508,18 @@ void * prize_loop(void * arg){
 
             srand(clock());
     
-            pthread_mutex_lock(&prize->lock);
-    
+            pthread_mutex_lock(&prize->lock_prize);
+
+            /* Find an empty position in the array */
             for (i = 0; i < 10; i++) {
                 
+                /* store prize in first empty position in array */
                 if (prize->prize_data[i].ch == -1) {
 
                     /* Find an empty space to spawn the prize */
+                    pthread_mutex_lock(&prize->lock_free);
                     find_empty (&pos_x, &pos_y, prize->n_players, prize->free_space);
+                    pthread_mutex_unlock(&prize->lock_free);
     
                     /* Save the prize data */
                     prize->prize_data[i].hp = (rand() % 5) + 1;
@@ -471,22 +529,27 @@ void * prize_loop(void * arg){
                     prize->n_prizes++;
     
                     /* Draw prize */
+                    pthread_mutex_lock(&prize->lock_window);
                     wmove(prize->my_win, pos_y, pos_x);
                     waddch(prize->my_win, prize->prize_data[i].ch);
                     wrefresh(prize->my_win);
+                    pthread_mutex_unlock(&prize->lock_window);
 
                     /* Send the change to all the players in the game */
                     msg.old_status.ch = -1;
                     msg.new_status = prize->prize_data[i];
                     msg.msg_type = field_status;
                     msg.arr_position = -1;
+
+                    pthread_mutex_lock(&prize->lock_player);
                     send_all_field_status(&msg, prize->con_socket, prize->player_data, prize->n_bots);
+                    pthread_mutex_unlock(&prize->lock_player);
                     
                     break;
                 }
             }
 
-            pthread_mutex_unlock(&prize->lock);
+            pthread_mutex_unlock(&prize->lock_prize);
     
         }
     
@@ -510,7 +573,7 @@ void * player_loop(void * arg){
     message_t msg;
     msg_field_update msg_update;
 
-    countdown_thread_t args_countdown;
+    countdown_thread_t args_countdown[MAX_PLAYERS];
     player_info_t tmp_player;
 
     while (1) {
@@ -518,30 +581,35 @@ void * player_loop(void * arg){
         /* Receive message from the clients */
         n_bytes = recv(player->con_socket[self], &msg, sizeof(message_t), 0);
 
+        pthread_mutex_lock(&player->lock_player);
+
         /* Socket closed or error */
         if(n_bytes != sizeof(message_t)){
 
-            if(n_bytes == 0) { // Client closed the socket
-                
-                pthread_mutex_lock(&player->lock);
+            /* Client closed the socket */
+            if(n_bytes == 0) {
 
                 tmp_player = player->player_data[self];
 
                 /* Take the player out of the game */
                 player->player_data[self].ch = -1;
                 player->n_players--;
+
+                pthread_mutex_lock(&player->lock_free);
                 player->free_space[player->player_data[self].pos_y - 1][player->player_data[self].pos_x - 1] = 1;
+                pthread_mutex_unlock(&player->lock_free);
 
                 close(player->con_socket[self]);
 
+                pthread_mutex_lock(&player->lock_window);
                 wmove(player->my_win, player->player_data[self].pos_y, player->player_data[self].pos_x);
                 waddch(player->my_win, ' ');
                 wrefresh(player->my_win);
 
                 /* Update the message window */
                 show_all_health(player->message_win, player->player_data);
+                pthread_mutex_unlock(&player->lock_window);
 
-                pthread_mutex_unlock(&player->lock);
 
                 /* send field_status update to everyone */
                 msg_update.old_status = tmp_player;
@@ -549,22 +617,28 @@ void * player_loop(void * arg){
                 msg_update.msg_type = field_status;
                 msg_update.arr_position = self;
                 send_all_field_status(&msg_update, player->con_socket, player->player_data, player->n_bots);
+                
+                pthread_mutex_unlock(&player->lock_player);
 
                 return 0;
             }
+
+            pthread_mutex_unlock(&player->lock_player);
             continue;
         }
 
         /* CONNECT MESSAGE */
         if (msg.msg_type == connection) {
 
-            pthread_mutex_lock(&player->lock);
-
             /* Find an empty space to spawn a player */
+            pthread_mutex_lock(&player->lock_free);
             find_empty (&pos_x, &pos_y, player->n_players, player->free_space); // Find an empty space to spawn the prize
+            pthread_mutex_unlock(&player->lock_free);
 
             /* Check if the ch choosen by the player is being used, if it is we assign a random ch to the player*/
-            player->player_data[self].ch = ch_checker(msg.player[0].ch, player->player_data);
+            if(player->n_players < 26){
+                player->player_data[self].ch = ch_checker(msg.player[0].ch, player->player_data);
+            }
 
             /* Save the player data */
             player->player_data[self].pos_x = pos_x;
@@ -572,24 +646,31 @@ void * player_loop(void * arg){
             player->player_data[self].hp = 10;
 
             /* Draw the player */
+            pthread_mutex_lock(&player->lock_window);
             wmove(player->my_win, pos_y, pos_x);
             waddch(player->my_win, player->player_data[self].ch);
             wrefresh(player->my_win);	
 
             show_all_health(player->message_win, player->player_data);
+            pthread_mutex_unlock(&player->lock_window);
 
             /* Prepare to send ball_information message */
             msg.msg_type = ball_information;
             msg.player_num = self;
             
             /* Copy the current data of the game */
+            pthread_mutex_lock(&player->lock_prize);
+            pthread_mutex_lock(&player->lock_bot);
+
             memcpy(msg.player, player->player_data, sizeof(player_info_t) * MAX_PLAYERS);
             memcpy(msg.bots, player->bot_data, sizeof(player_info_t) * 10);
             memcpy(msg.prizes, player->prize_data, sizeof(player_info_t) * 10);
 
+            pthread_mutex_unlock(&player->lock_bot);
+            pthread_mutex_unlock(&player->lock_prize);
+
             /* BALL_INFORMATION MESSAGE */
             n_bytes = send(player->con_socket[self], &msg, sizeof(msg), 0);
-
             if (n_bytes!= sizeof(message_t)){
                 perror("Error sending 3..");
                 exit(-1);
@@ -602,7 +683,6 @@ void * player_loop(void * arg){
             msg_update.arr_position = self;
             send_all_field_status(&msg_update, player->con_socket, player->player_data, player->n_bots);
 
-            pthread_mutex_unlock(&player->lock);
         }
 
         /* BALL_MOVEMENT MESSAGE */
@@ -612,8 +692,6 @@ void * player_loop(void * arg){
             a player in the game (anti-cheat) */
             if (player->player_data[msg.player_num].ch == msg.player[msg.player_num].ch) { 
 
-                pthread_mutex_lock(&player->lock);
-
                 /* Save the current position of the player */
                 msg_update.old_status = player->player_data[self];
 
@@ -621,12 +699,12 @@ void * player_loop(void * arg){
                 pos_y = player->player_data[self].pos_y;
 
                 /* Calculate the new position */
-                moove_player(&pos_x,&pos_y, msg.direction, player->message_win);
+                moove_player(&pos_x,&pos_y, msg.direction);
 
-                /* Check if the player hit another player */
+                /* Check if the player hits something */
                 for(int j = 0 ; j < (MAX_PLAYERS) - player->n_bots; j++){
 
-                    /* Check if the position in the array has a player (different then the player moving) */
+                    /* Check if the player hits a player */
                     if((player->player_data[j].ch != -1) && (j != self)) {
                         
                         /* See if the player is in the position that our current player is moving into */
@@ -634,17 +712,16 @@ void * player_loop(void * arg){
 
                             /*If the player that was hit has 0 lives then its GAME OVER */
                             if (player->player_data[j].hp == 0) {
-    
                                 clear_to_move = 0;
                                 break;
                             }
 
                             /* If the player has less(or equal to) than 9 lives increment HP */
-                            if (player->player_data [self].hp <= 9) {
-                                player->player_data [self].hp++;
+                            if (player->player_data[self].hp <= 9) {
+                                player->player_data[self].hp++;
                             }
 
-                            player->player_data [j].hp--; // Decrease HP of the player that was hit
+                            player->player_data[j].hp--; // Decrease HP of the player that was hit
 
                             /* send field_status update to everyone */
                             msg_update.old_status.ch = -1;
@@ -665,19 +742,30 @@ void * player_loop(void * arg){
                                     exit(-1);
                                 }
 
-                                args_countdown.self = j;
-                                args_countdown.server_thread = player->thread_id[j];
+                                args_countdown[j].self = j;
+                                args_countdown[j].server_thread = player->thread_id[j];
 
-                                args_countdown.players = player->player_data;
-                                args_countdown.free_space = &player->free_space[player->player_data[j].pos_y - 1][player->player_data[j].pos_x - 1];
+                                args_countdown[j].players = player->player_data;
+                                pthread_mutex_lock(&player->lock_free);
+                                args_countdown[j].free_space = &player->free_space[player->player_data[j].pos_y - 1][player->player_data[j].pos_x - 1];
+                                pthread_mutex_unlock(&player->lock_free);
 
-                                args_countdown.n_players = &player->n_players;
-                                args_countdown.my_win = player->my_win;
+                                args_countdown[j].n_players = &player->n_players;
+                                args_countdown[j].my_win = player->my_win;
 
-                                args_countdown.n_bots = player->n_bots;
-                                args_countdown.all_sockets = player->con_socket;
+                                args_countdown[j].n_bots = player->n_bots;
+                                args_countdown[j].all_sockets = player->con_socket;
 
-                                pthread_create(&player->thread_countdown_id[j], NULL, &countdown_loop, (void *) &args_countdown);
+                                args_countdown[j].lock_free = &player->lock_free;
+                                args_countdown[j].lock_player = &player->lock_player;
+                                args_countdown[j].lock_window = &player->lock_bot;
+
+                                pthread_mutex_unlock(&player->lock_player);
+
+                                pthread_create(&player->thread_countdown_id[j], NULL, &countdown_loop, (void *) &args_countdown[j]);
+
+                                pthread_mutex_lock(&player->lock_player);
+                            
                             } 
 
                             clear_to_move = 0; // Can't move into new position
@@ -686,19 +774,23 @@ void * player_loop(void * arg){
                         }
                     }
 
-                    /* Check if the player hit a bot */
+                    /* Check if the player hits a bot */
+                    pthread_mutex_lock(&player->lock_bot);
                     if ((player->bot_data[j].ch != -1) && (j < 10)) {
 
                         /* Player hits a bot */
                         if ((player->bot_data[j].pos_x == pos_x) && (player->bot_data[j].pos_y == pos_y)){
 
                             clear_to_move = 0; // Can't move into new position
+                            pthread_mutex_unlock(&player->lock_bot);
                             break;
                         } 
 
                     }
-                    
-                    /* Check if the player hit a prize */
+                    pthread_mutex_unlock(&player->lock_bot);
+
+                    /* Check if the player hits a prize */
+                    pthread_mutex_lock(&player->lock_prize);
                     if ((player->prize_data[j].ch != -1) && (j < 10)){
 
                         /* Player hits a prize */
@@ -718,10 +810,12 @@ void * player_loop(void * arg){
                             player->prize_data[j].ch = -1;
                             player->n_prizes--;
 
+                            pthread_mutex_unlock(&player->lock_prize);
                             break;
                         } 
 
                     }
+                    pthread_mutex_unlock(&player->lock_prize);
                 }
                 /* Move into new position */
                 if (clear_to_move) {
@@ -730,8 +824,11 @@ void * player_loop(void * arg){
                     wmove(player->my_win, player->player_data[self].pos_y, player->player_data[self].pos_x);
                     waddch(player->my_win,' ');
 
+                    pthread_mutex_lock(&player->lock_free);
                     player->free_space[player->player_data[self].pos_y - 1][player->player_data[self].pos_x - 1] = 1;
                     player->free_space[pos_y - 1][pos_x - 1] = 0;
+                    pthread_mutex_unlock(&player->lock_free);
+
                     player->player_data[self].pos_x = pos_x;
                     player->player_data[self].pos_y = pos_y;
 
@@ -748,23 +845,20 @@ void * player_loop(void * arg){
                 msg_update.arr_position = self;
                 send_all_field_status(&msg_update, player->con_socket, player->player_data, player->n_bots);
 
+                /* Update the message window */
+                pthread_mutex_lock(&player->lock_window);
+                show_all_health(player->message_win, player->player_data);
+                pthread_mutex_unlock(&player->lock_window);
+
                 clear_to_move = 1;
-
             } 
-
-            /* Update the message window */
-            show_all_health(player->message_win, player->player_data);
             
-
-            pthread_mutex_unlock(&player->lock);
         } 
 
         /* Reconnect msg handling */
         else if (msg.msg_type == reconnect) {
 
             pthread_cancel(player->thread_countdown_id[self]);
-
-            pthread_mutex_lock(&player->lock);
 
             /* Reset the health of the player (Respawn)*/
             player->player_data[self].hp = 10;
@@ -776,9 +870,9 @@ void * player_loop(void * arg){
             msg_update.arr_position = self;
             send_all_field_status(&msg_update, player->con_socket, player->player_data, player->n_bots);
 
-            pthread_mutex_unlock(&player->lock);
-
         }
+    
+        pthread_mutex_unlock(&player->lock_player);
     }
 
 }
@@ -876,11 +970,40 @@ int main(int argc, char *argv[])
     }
 
     /* Initialize the mutex */
-    if (pthread_mutex_init(&serv_arg.lock, NULL) != 0)
+    if (pthread_mutex_init(&serv_arg.lock_player, NULL) != 0)
     {
         printf("\n mutex init failed\n");
         return 1;
     }
+
+    /* Initialize the mutex */
+    if (pthread_mutex_init(&serv_arg.lock_bot, NULL) != 0)
+    {
+        printf("\n mutex init failed\n");
+        return 1;
+    }
+
+    /* Initialize the mutex */
+    if (pthread_mutex_init(&serv_arg.lock_prize, NULL) != 0)
+    {
+        printf("\n mutex init failed\n");
+        return 1;
+    }
+
+    /* Initialize the mutex */
+    if (pthread_mutex_init(&serv_arg.lock_free, NULL) != 0)
+    {
+        printf("\n mutex init failed\n");
+        return 1;
+    }
+
+    /* Initialize the mutex */
+    if (pthread_mutex_init(&serv_arg.lock_window, NULL) != 0)
+    {
+        printf("\n mutex init failed\n");
+        return 1;
+    }
+
 
     pthread_t thread_id[N_THREADS];
 
@@ -895,13 +1018,15 @@ int main(int argc, char *argv[])
     {   
         new_con = accept(sock_fd, (struct sockaddr*)&client_addr, &client_addr_size);
 
-        pthread_mutex_lock(&serv_arg.lock);
-
+        pthread_mutex_lock(&serv_arg.lock_player);
         n_players_copy = serv_arg.n_players;
+        pthread_mutex_unlock(&serv_arg.lock_player);
+
+        pthread_mutex_lock(&serv_arg.lock_prize);
         n_prizes_copy = serv_arg.n_prizes;
+        pthread_mutex_unlock(&serv_arg.lock_prize);
 
-        pthread_mutex_unlock(&serv_arg.lock);
-
+    
         /* check if accept returned errors */
         if (new_con == -1) {
             perror("Accept error..");
@@ -909,27 +1034,27 @@ int main(int argc, char *argv[])
         /* check if field is full */
         else if (n_players_copy < players_max - n_prizes_copy) { 
 
+            pthread_mutex_lock(&serv_arg.lock_player);
             for (i = 0; i < players_max; i++) {
                 if (serv_arg.player_data[i].ch == -1) { // Get the first avaiable space in player_data
 
                     serv_arg.tmp_self = i;
-                    serv_arg.con_socket[i] = new_con;
 
+                    serv_arg.con_socket[i] = new_con;
+                    
+                    pthread_mutex_unlock(&serv_arg.lock_player);
                     break;
                 }
             }
-
-
+            pthread_mutex_unlock(&serv_arg.lock_player);
 
             /* Lauch thread for the new player */
             pthread_create(&thread_id[i], NULL, &player_loop, (void *) &serv_arg);
 
-            pthread_mutex_lock(&serv_arg.lock);
-
             /* Increase the number of players */
+            pthread_mutex_lock(&serv_arg.lock_player);
             serv_arg.n_players = serv_arg.n_players + 1;
-
-            pthread_mutex_unlock(&serv_arg.lock);
+            pthread_mutex_unlock(&serv_arg.lock_player);
         } 
         /* send loby_full message if the field is full */
         else {
@@ -947,10 +1072,35 @@ int main(int argc, char *argv[])
     }
 
     /* Delete the mutex */
-    if (pthread_mutex_destroy(&serv_arg.lock) != 0) {                                     
+    if (pthread_mutex_destroy(&serv_arg.lock_player) != 0) {                                     
         perror("pthread_mutex_destroy() error");                                    
         exit(2);                                                                    
     }  
+
+    /* Delete the mutex */
+    if (pthread_mutex_destroy(&serv_arg.lock_bot) != 0) {                                     
+        perror("pthread_mutex_destroy() error");                                    
+        exit(2);                                                                    
+    }
+
+    /* Delete the mutex */
+    if (pthread_mutex_destroy(&serv_arg.lock_prize) != 0) {                                     
+        perror("pthread_mutex_destroy() error");                                    
+        exit(2);                                                                    
+    }  
+
+    /* Delete the mutex */
+    if (pthread_mutex_destroy(&serv_arg.lock_free) != 0) {                                     
+        perror("pthread_mutex_destroy() error");                                    
+        exit(2);                                                                    
+    }  
+
+    /* Delete the mutex */
+    if (pthread_mutex_destroy(&serv_arg.lock_window) != 0) {                                     
+        perror("pthread_mutex_destroy() error");                                    
+        exit(2);                                                                    
+    }  
+
 
     /* End curses mode */
   	endwin();

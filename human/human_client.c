@@ -233,39 +233,6 @@ void * communication_thread(void * arg){
             
             pthread_mutex_unlock(thread_args->lock);
 
-
-
-
-
-            // /* This section of code will draw the field status and update the windows */
-            // clear_screen(thread_args->my_win);
-
-            // /* Draw all the players, bots and prizes */
-            // for(int i = 0; i < 10; i++){
-
-            //     /* If the player is in the game, draw it */
-            //     if(thread_args->msg.player[i].ch != -1){
-
-            //         /* If drawing this client's character, change color */
-            //         if(thread_args->msg.player[i].ch == thread_args->character){
-            //             draw_player(thread_args->my_win, &thread_args->msg.player[i], 1, 4);
-            //         } else {
-            //             /* Draw all the players */
-            //             draw_player(thread_args->my_win, &thread_args->msg.player[i], 1, 1);
-            //         }
-            //     }
-            //     /* If the bot is in the game, draw it */
-            //     if (thread_args->msg.bots[i].ch != -1){
-            //         /* Draw all the bots */
-            //         draw_player(thread_args->my_win, &thread_args->msg.bots[i], 1, 2);
-            //     }
-            //     /* If the prize is in the game, draw it */
-            //     if (thread_args->msg.prizes[i].ch != -1){
-            //         /* Draw all the bots */
-            //         draw_player(thread_args->my_win, &thread_args->msg.prizes[i], 1, 3);
-            //     }
-            // }
-
         /* If the message received is health_0 start the countdown */
         } else if (msg.msg_type == health_0){
 
@@ -467,7 +434,6 @@ int main(int argc, char *argv[]){
     args_thread.socket_fd = socket_fd;
     args_thread.my_win = my_win;
     args_thread.message_win = message_win;
-    args_thread.server_addr = server_addr;
     args_thread.player = &player;
     args_thread.player_id = msg.player_num;
     memcpy(args_thread.player_data, msg.player, sizeof(args_thread.player_data));

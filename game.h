@@ -60,7 +60,6 @@ typedef struct thread_args_t
 {
     WINDOW * my_win;
     WINDOW * message_win;
-    struct sockaddr_in server_addr;
     int socket_fd;
     int player_id;
     player_info_t player_data[MAX_PLAYERS];
@@ -84,6 +83,11 @@ typedef struct countdown_thread_t
     int * free_space;
 
     pthread_t server_thread;
+
+    pthread_mutex_t * lock_player;
+    pthread_mutex_t * lock_free;
+    pthread_mutex_t * lock_window;
+
 
 } countdown_thread_t;
 
@@ -111,6 +115,13 @@ typedef struct server_args_t
     pthread_t thread_id [MAX_PLAYERS];
     pthread_t thread_countdown_id [MAX_PLAYERS];
 
-    pthread_mutex_t lock;
+    pthread_mutex_t lock_player;
+    pthread_mutex_t lock_bot;
+    pthread_mutex_t lock_prize;
+    pthread_mutex_t lock_free;
+    pthread_mutex_t lock_window;
+
+
+
 
 } server_args_t;
